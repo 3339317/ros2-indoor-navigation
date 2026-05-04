@@ -1,0 +1,50 @@
+input_path: ""
+output_path: "/tmp/indoor_nav_preprocessed_map.json"
+
+map:
+  name: "indoor_map"
+  frame_id: "map"
+
+point_cloud:
+  # Web 显示点云抽样间隔。1 最密，3 是当前建议值。
+  sample_step: 3
+  # 读入后用于计算的体素降采样，0 表示关闭。
+  voxel_leaf_size: 0.03
+
+floors:
+  # auto 会根据 Z 直方图寻找主要楼层；manual 使用 manual_ranges。
+  mode: "auto"
+  histogram_bin_size: 0.10
+  min_peak_points: 800
+  min_floor_gap: 1.20
+  floor_thickness: 0.45
+  manual_ranges:
+    # - {id: "floor_1", z_min: -0.20, z_max: 0.30}
+    # - {id: "floor_2", z_min: 2.80, z_max: 3.30}
+
+drivable_area:
+  # 第一版只生成每层的初始矩形区域，后续可以在 Web 端修正。
+  generate: false
+  boundary_margin: 0.20
+  percentile_low: 2.0
+  percentile_high: 98.0
+  min_points_per_area: 1000
+
+stairs:
+  # 自动提取连接相邻楼层的楼梯/坡道 connector。
+  generate: true
+  grid_resolution: 0.20
+  min_cell_points: 1
+  min_component_cells: 8
+  # 剔除贴近上下楼层平台的点，只看中间高度变化区域。
+  floor_exclusion: 0.25
+  min_vertical_span: 0.60
+  # 候选区域至少覆盖相邻楼层高度差的比例。
+  min_floor_coverage: 0.40
+  min_length: 0.80
+  max_width: 4.00
+  polyline_points: 8
+
+metadata:
+  robot_radius: 0.25
+  grid_resolution: 0.05
