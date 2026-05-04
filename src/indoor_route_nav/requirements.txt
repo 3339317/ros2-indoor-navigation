@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+numpy
+PyYAML
+open3d
+opencv-python
