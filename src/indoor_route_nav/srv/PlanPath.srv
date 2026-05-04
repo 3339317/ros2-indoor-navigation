@@ -1,0 +1,9 @@
+geometry_msgs/PoseStamped start
+geometry_msgs/PoseStamped goal
+float64 resolution
+float64 robot_radius
+string drivable_areas_json
+---
+bool success
+string message
+nav_msgs/Path path
