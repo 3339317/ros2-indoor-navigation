@@ -1,0 +1,3364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ROS2 Web 3D Route Nav</title>
+<style>
+:root{
+    --bg-deep:#070c18;
+    --bg-panel:#0a1222;
+    --bg-card:#0d1728;
+    --border:#1a2e50;
+    --border-focus:#2979b5;
+    --accent:#0ac;
+    --accent-dim:rgba(0,170,204,0.12);
+    --green:#0ce676;
+    --green-dim:rgba(12,230,118,0.14);
+    --red:#ff3b5c;
+    --red-dim:rgba(255,59,92,0.14);
+    --amber:#f0a020;
+    --amber-dim:rgba(240,160,32,0.14);
+    --blue:#2980cc;
+    --blue-dim:rgba(41,128,204,0.14);
+    --text:#c4d0e0;
+    --text-dim:#5e6d82;
+    --radius:10px;
+    --radius-sm:6px;
+    --transition:0.2s cubic-bezier(0.4,0,0.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden}
+body{
+    font-family:"Segoe UI","Helvetica Neue","Noto Sans SC","PingFang SC",sans-serif;
+    background:var(--bg-deep);
+    color:var(--text);
+}
+body::before{
+    content:"";
+    position:fixed;inset:0;
+    background-image:
+        linear-gradient(rgba(0,170,204,0.012) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,170,204,0.012) 1px,transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none;z-index:0;
+}
+.header{
+    padding:6px 14px;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,var(--bg-panel),var(--bg-deep));
+    position:relative;z-index:1;
+    display:flex;align-items:center;gap:16px;
+}
+.header b{font-size:15px;color:var(--accent);letter-spacing:1px}
+.main{
+    display:grid;
+    grid-template-columns:340px 1fr 280px;
+    gap:10px;padding:10px;
+    height:calc(100% - 44px);
+    position:relative;z-index:1;
+}
+.panel{
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:linear-gradient(160deg,var(--bg-panel),var(--bg-deep));
+    display:flex;flex-direction:column;min-height:0;
+    backdrop-filter:blur(8px);
+}
+.panel h3{
+    margin:0;padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    font-size:14px;font-weight:600;
+    color:var(--accent);letter-spacing:1px;
+    background:linear-gradient(180deg,rgba(0,170,204,0.06),transparent);
+}
+.panel-body{padding:10px;overflow:auto;flex:1}
+.panel-body::-webkit-scrollbar{width:5px}
+.panel-body::-webkit-scrollbar-track{background:transparent}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.panel-body::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+.btn{
+    padding:7px 14px;border:none;border-radius:var(--radius-sm);
+    cursor:pointer;color:#fff;margin:3px;font-size:12px;
+    font-weight:500;letter-spacing:0.3px;
+    transition:transform var(--transition),box-shadow var(--transition),filter var(--transition);
+    position:relative;
+}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.15)}
+.btn:active{transform:translateY(0);filter:brightness(0.95)}
+.green{background:linear-gradient(135deg,#0caa46,#0ce676);box-shadow:0 2px 10px var(--green-dim)}
+.green:hover{box-shadow:0 4px 18px var(--green-dim)}
+.blue{background:linear-gradient(135deg,#2070b0,#2980cc);box-shadow:0 2px 10px var(--blue-dim)}
+.blue:hover{box-shadow:0 4px 18px var(--blue-dim)}
+.gray{background:linear-gradient(135deg,#3a4a60,#4a5c78);box-shadow:0 2px 6px rgba(0,0,0,0.3)}
+.red{background:linear-gradient(135deg,#d6283c,#ff3b5c);box-shadow:0 2px 10px var(--red-dim)}
+.red:hover{box-shadow:0 4px 18px var(--red-dim)}
+.orange{background:linear-gradient(135deg,#d08810,#f0a020);color:#111;box-shadow:0 2px 10px var(--amber-dim)}
+.orange:hover{box-shadow:0 4px 18px var(--amber-dim)}
+.row{margin-bottom:8px}
+.row label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:4px;font-weight:500;letter-spacing:0.2px}
+.row input{
+    width:100%;padding:8px 10px;border-radius:var(--radius-sm);
+    border:1px solid var(--border);background:var(--bg-deep);
+    color:var(--text);font-size:12px;
+    transition:border-color var(--transition),box-shadow var(--transition);
+}
+.row input:focus{outline:none;border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-dim)}
+.row input[type="checkbox"]{width:auto;margin-right:6px;accent-color:var(--accent)}
+#mapCanvas{width:100%;height:100%;display:block;background:#060d1a;border-radius:var(--radius)}
+.canvas-wrap{
+    position:relative;height:100%;min-height:620px;
+    border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;
+    box-shadow:0 0 40px rgba(0,170,204,0.06),inset 0 0 80px rgba(0,0,0,0.5);
+}
+.canvas-wrap::before{
+    content:"";position:absolute;inset:0;
+    border-radius:var(--radius);
+    box-shadow:inset 0 0 1px rgba(0,170,204,0.15);
+    pointer-events:none;z-index:2;
+}
+.canvas-wrap::after{
+    content:"";position:absolute;
+    top:10px;left:10px;width:22px;height:22px;
+    border-top:2px solid var(--accent);border-left:2px solid var(--accent);
+    border-radius:3px 0 0 0;pointer-events:none;z-index:2;opacity:0.5;
+}
+.small{font-size:11px;color:var(--text-dim);line-height:1.7}
+pre{white-space:pre-wrap;word-break:break-word}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px}
+.tool-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-bottom:10px}
+.tab-btn{
+    padding:7px 6px;border:1px solid var(--border);
+    border-radius:var(--radius-sm);background:var(--bg-deep);
+    color:var(--text-dim);cursor:pointer;font-size:11px;font-weight:500;
+    transition:all var(--transition);
+}
+.tab-btn:hover{color:var(--text);border-color:var(--border-focus)}
+.tab-btn.active{
+    background:linear-gradient(135deg,#1a4070,#2070a0);
+    color:#fff;border-color:var(--accent);
+    box-shadow:0 0 12px var(--accent-dim);
+}
+.tool-page{display:none}
+.tool-page.active{display:block}
+.status{color:var(--accent);font-weight:bold}
+.tip{
+    position:absolute;
+    left:10px;top:10px;
+    background:rgba(7,12,24,0.85);
+    backdrop-filter:blur(6px);
+    padding:6px 12px;
+    border-radius:var(--radius-sm);
+    font-size:11px;color:var(--text);
+    z-index:5;max-width:520px;
+    border:1px solid var(--border);
+}
+.section-title{
+    margin-top:10px;color:var(--accent);font-size:12px;
+    font-weight:600;letter-spacing:1px;text-transform:uppercase;
+}
+.mode-box{
+    margin-top:8px;padding:8px 10px;
+    border:1px solid var(--border);border-radius:var(--radius-sm);
+    background:var(--bg-deep);font-size:11px;line-height:1.7;
+}
+.direction-pad{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:auto auto auto;
+    gap:4px;margin-top:10px;padding:8px;
+    border:1px solid var(--border);border-radius:var(--radius);
+    background:var(--bg-deep);
+    justify-items:center;align-items:center;
+}
+.dir-btn{
+    width:66px;height:56px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    background:linear-gradient(160deg,var(--bg-card),var(--bg-deep));
+    color:#c0ccdd;cursor:pointer;
+    font-size:11px;line-height:1.3;
+    user-select:none;-webkit-user-select:none;
+    transition:all var(--transition);
+}
+.dir-btn:hover{border-color:var(--border-focus);color:#fff}
+.dir-btn:active,.dir-btn.active{
+    background:linear-gradient(135deg,#1a4070,#2070a0);
+    border-color:var(--accent);color:#fff;
+    box-shadow:0 0 14px var(--accent-dim);
+}
+.dir-stop{
+    width:66px;height:56px;
+    background:linear-gradient(135deg,#991b1b,#c0283c);
+    border-color:#ef4454;color:#fff;
+    font-weight:bold;font-size:13px;
+    transition:all var(--transition);
+}
+.dir-stop:hover{filter:brightness(1.2);box-shadow:0 0 14px var(--red-dim)}
+.dir-stop:active{filter:brightness(0.9)}
+@keyframes breathe{
+    0%,100%{opacity:0.4;box-shadow:0 0 4px var(--accent-dim)}
+    50%{opacity:1;box-shadow:0 0 12px var(--accent-dim)}
+}
+@keyframes warnPulse{
+    0%,100%{border-color:var(--border)}
+    50%{border-color:var(--red)}
+}
+.status-dot{
+    display:inline-block;width:8px;height:8px;
+    border-radius:50%;margin-right:6px;
+    vertical-align:middle;
+}
+.status-dot.online{background:var(--green);animation:breathe 2s ease-in-out infinite}
+.status-dot.offline{background:var(--red);animation:breathe 1s ease-in-out infinite}
+@media(max-width:1350px){.main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="header">
+    <div><b>ROS2 Web 3D 点云路线导航</b></div>
+    <div class="small" id="topStatus"><span class="status-dot online"></span>状态：等待操作</div>
+</div>
+
+<div class="main">
+    <div class="panel">
+        <h3>操作 / 参数</h3>
+        <div class="panel-body">
+
+            <div class="tool-tabs">
+                <button class="tab-btn active" data-tool-page="map" onclick="showToolPage('map')">地图</button>
+                <button class="tab-btn" data-tool-page="plan" onclick="showToolPage('plan')">规划</button>
+                <button class="tab-btn" data-tool-page="nav" onclick="showToolPage('nav')">导航</button>
+                <button class="tab-btn" data-tool-page="chassis" onclick="showToolPage('chassis')">底盘</button>
+                <button class="tab-btn" data-tool-page="params" onclick="showToolPage('params')">参数</button>
+            </div>
+
+            <div class="tool-page active" id="toolPageMap">
+                <div class="section-title">地图工程</div>
+                <div class="toolbar">
+                    <label class="btn green" style="cursor:pointer;">
+                        打开3D点云地图
+                        <input id="pcdFileInput" type="file" accept=".pcd,.ply,.xyz,.xyzn,.xyzrgb" style="display:none">
+                    </label>
+                    <label class="btn blue" style="cursor:pointer;">
+                        读取地图工程
+                        <input id="workspaceFileInput" type="file" accept=".json" style="display:none">
+                    </label>
+                    <button class="btn green" onclick="saveMapWorkspace()">保存地图工程</button>
+                </div>
+
+                <div class="section-title">楼层 / 高度过滤</div>
+                <div class="mode-box">
+                    <div class="row">
+                        <label><input id="zFilterEnabled" type="checkbox">只显示并选取当前高度层</label>
+                    </div>
+                    <div class="row"><label>Z 最小值</label><input id="zFilterMin" type="number" step="0.05" value="0.0"></div>
+                    <div class="row"><label>Z 最大值</label><input id="zFilterMax" type="number" step="0.05" value="0.0"></div>
+                    <div class="toolbar">
+                        <button class="btn blue" onclick="applyZFilterInputs()">应用高度层</button>
+                        <button class="btn gray" onclick="useFullZRange()">全部高度</button>
+                        <button class="btn gray" onclick="nudgeZFilter(-1)">上一层 ↑</button>
+                        <button class="btn gray" onclick="nudgeZFilter(1)">下一层 ↓</button>
+                    </div>
+                    <div id="zFilterInfo" class="small">点云高度范围: -</div>
+                </div>
+            </div>
+
+            <div class="tool-page" id="toolPagePlan">
+                <div class="section-title">可行驶区域 / 自动规划</div>
+                <div id="drivableAreaInfo" class="small" style="margin-bottom:8px;color:#93c5fd;">区域：0 个 | 绘制中：0 点</div>
+                <div class="row">
+                    <label>区域列表</label>
+                    <select id="drivableAreaSelect"></select>
+                </div>
+                <div id="drivableAreaList" class="small" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+                <div class="toolbar">
+                    <button class="btn blue" onclick="setMode('draw_drivable_area')">✏ 绘制区域</button>
+                    <button class="btn green" onclick="finishDrivableArea()">✔ 完成区域</button>
+                    <button class="btn gray" onclick="undoDrivableAreaPoint()">↩ 撤销点</button>
+                    <button class="btn red" data-action="delete-selected-area" onclick="deleteSelectedDrivableArea()">🗑 删除选中</button>
+                    <button class="btn red" data-action="mode-delete-area" onclick="setMode('delete_drivable_area')">🗑 点选删除</button>
+                    <button class="btn orange" onclick="setMode('plan_goal')">🎯 点击规划</button>
+                </div>
+                <div class="section-title">中心线生成区域</div>
+                <div id="connectorInfo" class="small" style="margin-bottom:8px;color:#fdba74;">中心线：0 点</div>
+                <div class="toolbar">
+                    <button class="btn orange" onclick="setMode('draw_stair_connector')">标定中心线</button>
+                    <button class="btn green" onclick="finishStairConnector()">生成区域</button>
+                    <button class="btn gray" onclick="undoStairConnectorPoint()">撤销中心点</button>
+                    <button class="btn red" onclick="clearCenterlinePoints()">清空中心线</button>
+                </div>
+                <div class="mode-box">
+                    <div class="row"><label>通道宽度(m)</label><input id="centerlineAreaWidth" type="number" step="0.05" value="1.20"></div>
+                    <div class="row"><label>采样间距(m)</label><input id="centerlineAreaSampleGap" type="number" step="0.05" value="0.25"></div>
+                    <div class="row"><label>点云贴合半径(m)</label><input id="centerlineAreaFitRadius" type="number" step="0.05" value="0.35"></div>
+                    <div class="row"><label>Z 余量(m)</label><input id="centerlineAreaZMargin" type="number" step="0.05" value="0.20"></div>
+                    <div class="small">沿楼梯、坡道或走廊中心点击点云点，再按宽度扩张成可行驶区域。</div>
+                </div>
+                <div class="row"><label>规划分辨率(m)</label><input id="planResolution" type="number" step="0.05" value="0.20"></div>
+                <div class="row"><label>机器人半径(m)</label><input id="planRobotRadius" type="number" step="0.05" value="0.15"></div>
+            </div>
+
+            <div class="mode-box">
+                <div id="modeText"><b>当前模式：none</b></div>
+                <div id="modeHint">提示：请选择一个模式。</div>
+            </div>
+
+            <div class="tool-page" id="toolPageNav">
+                <div class="section-title">导航 / 系统</div>
+                <div class="toolbar">
+                    <button class="btn orange" onclick="startNavigation()">开始导航</button>
+                    <button class="btn gray" onclick="stopNavigation()">停止导航</button>
+                    <button class="btn red" onclick="emergencyStop()">紧急停止</button>
+                    <button class="btn blue" onclick="setMode('set_initial_pose')">📍 手动定位</button>
+                </div>
+
+                <div class="toolbar">
+                    <button class="btn blue" onclick="openRosImage()">显示图像</button>
+                    <button class="btn gray" onclick="closeRosImage()">关闭图像</button>
+                    <button class="btn red" onclick="shutdownProgram()">关闭程序</button>
+                </div>
+            </div>
+
+            <div class="tool-page" id="toolPageChassis">
+                <div class="section-title">模式切换</div>
+                <div class="toolbar">
+                    <button class="btn green" onclick="chassisSetMode('stand')">站立</button>
+                    <button class="btn blue" onclick="chassisSetMode('walk')">行走</button>
+                    <button class="btn orange" id="btnStairToggle" onclick="chassisToggleStair()">楼梯: 关</button>
+                    <button class="btn gray" onclick="chassisSitdown()">蹲下</button>
+                </div>
+
+                <div class="section-title">速度控制</div>
+                <div class="row">
+                    <label>线速度 <span id="chassisSpeedLabel">0.40</span> m/s</label>
+                    <input id="chassisSpeedSlider" type="range" min="0.05" max="1.50" step="0.05" value="0.40" oninput="chassisSpeedChanged()">
+                </div>
+                <div class="row">
+                    <label>角速度 <span id="chassisTurnSpeedLabel">0.50</span> rad/s</label>
+                    <input id="chassisTurnSpeedSlider" type="range" min="0.10" max="2.00" step="0.05" value="0.50" oninput="chassisTurnSpeedChanged()">
+                </div>
+
+                <div class="direction-pad">
+                    <button class="dir-btn" id="dirFwd"     data-vx="+1" data-vy="0" data-vz="0"  onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">▲<br>前进</button>
+                    <button class="dir-btn" id="dirTurnL"   data-vx="0" data-vy="0" data-vz="+1" onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">↺<br>左转</button>
+                    <button class="dir-btn dir-stop" id="dirStop" onclick="chassisStop()">STOP</button>
+                    <button class="dir-btn" id="dirTurnR"   data-vx="0" data-vy="0" data-vz="-1" onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">↻<br>右转</button>
+                    <button class="dir-btn" id="dirBack"    data-vx="-1" data-vy="0" data-vz="0"  onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">▼<br>后退</button>
+                    <button class="dir-btn" id="dirLeft"    data-vx="0" data-vy="+1" data-vz="0"  onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">◄<br>左移</button>
+                    <button class="dir-btn" id="dirRight"   data-vx="0" data-vy="-1" data-vz="0"  onmousedown="startDirMove(this)" onmouseup="stopDirMove()" onmouseleave="stopDirMove()" ontouchstart="startDirMove(this)" ontouchend="stopDirMove()">►<br>右移</button>
+                </div>
+
+                <div class="section-title">安全 / 传感器</div>
+                <div class="toolbar">
+                    <button class="btn red" onclick="chassisEmgyStop()">⚠ 紧急停止</button>
+                    <button class="btn blue" id="btnImuToggle" onclick="chassisToggleImu()">IMU: 关</button>
+                </div>
+            </div>
+            <div class="tool-page" id="toolPageParams">
+                <div class="toolbar">
+                    <button class="btn blue" onclick="saveParamsConfig()">保存参数</button>
+                    <label class="btn gray" style="cursor:pointer;">
+                        读取参数
+                        <input id="paramsCfgFileInput" type="file" accept=".yaml,.yml" style="display:none">
+                    </label>
+                </div>
+
+                <div class="section-title">速度控制</div>
+                <div class="row"><label>最大线速度 (m/s)</label><input class="param-input" id="max_vx" type="number" step="any"></div>
+                <div class="row"><label>最大角速度 (rad/s)</label><input class="param-input" id="max_wz" type="number" step="any"></div>
+                <div class="row"><label>最小线速度 (m/s)</label><input class="param-input" id="min_vx" type="number" step="any"></div>
+                <div class="row"><label>最小角速度 (rad/s)</label><input class="param-input" id="min_wz" type="number" step="any"></div>
+                <div class="row"><label>速度平滑系数</label><input class="param-input" id="alpha" type="number" step="any"></div>
+                <div class="row"><label>前视距离 (m)</label><input class="param-input" id="lookahead_distance" type="number" step="any"></div>
+
+                <div class="section-title">路径跟踪</div>
+                <div class="row"><label>路径转向增益</label><input class="param-input" id="path_yaw_kp" type="number" step="any"></div>
+                <div class="row"><label>到点距离阈值 (m)</label><input class="param-input" id="arrival_dist" type="number" step="any"></div>
+                <div class="row"><label>到点角度阈值 (°)</label><input class="param-input" id="arrival_angle" type="number" step="any"></div>
+                <div class="row"><label>终点朝向增益</label><input class="param-input" id="final_yaw_kp" type="number" step="any"></div>
+                <div class="row"><label>终点减速距离 (m)</label><input class="param-input" id="end_slowdown_distance" type="number" step="any"></div>
+                <div class="row"><label>大偏角限速角 (°)</label><input class="param-input" id="heading_slow_angle_deg" type="number" step="any"></div>
+
+                <div class="section-title">障碍物</div>
+                <div class="row"><label>停障距离 (m)</label><input class="param-input" id="obstacle_threshold" type="number" step="any"></div>
+                <div class="row"><label>恢复延时 (s)</label><input class="param-input" id="resume_delay" type="number" step="any"></div>
+                <div class="row"><label>障碍减速系数</label><input class="param-input" id="deceleration_alpha" type="number" step="any"></div>
+                <button class="btn green" onclick="applyControlParams()">应用控制参数</button>
+
+                <div class="section-title">路径采样参数</div>
+                <div class="row"><label>路径采样间距</label><input class="param-input" id="route_sample_gap" type="number" step="any"></div>
+                <button class="btn green" onclick="applySmoothingParams()">应用路径采样参数</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>3D 点云视图</h3>
+        <div class="panel-body">
+            <div class="toolbar">
+                <button class="btn gray" onclick="fitView()">适配视图</button>
+                <button class="btn gray" onclick="resetView()">重置视图</button>
+                <button class="btn gray" onclick="togglePcdVisible()">显示/隐藏点云</button>
+                <button class="btn gray" onclick="toggleRouteVisible()">显示/隐藏路线</button>
+                <button class="btn gray" onclick="toggleRobotVisible()">显示/隐藏机器人</button>
+                <button class="btn gray" onclick="refreshState()">刷新状态</button>
+            </div>
+
+            <div class="canvas-wrap" id="canvasWrap">
+                <div class="tip" id="canvasTip">
+                    提示：左键拖动旋转（当前模式为 none 时），右键拖动平移，滚轮缩放。
+                </div>
+                <canvas id="mapCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>状态</h3>
+        <div class="panel-body">
+            <div class="status" id="statusText">等待操作</div>
+            <div class="small" id="poseText">当前位置: X=--- Y=--- Z=--- Yaw=---</div>
+            <div class="small" id="velText">当前速度: vx=0.00 wz=0.00</div>
+            <div class="small" id="obsText">前方障碍距离: --- m</div>
+            <div class="small" id="navText">导航阶段: -</div>
+            <div class="small" id="lookaheadText">前视目标: -</div>
+            <div class="small" id="cameraTopicText">图像话题: -</div>
+            <hr>
+            <div style="flex:1;min-height:150px;border:1px solid #23314a;border-radius:8px;overflow:hidden;margin-bottom:10px">
+                <img id="cameraImg" style="width:100%;height:100%;object-fit:cover;background:black;">
+            </div>
+            <pre id="routeInfo"></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("mapCanvas");
+const wrap = document.getElementById("canvasWrap");
+const ctx = canvas.getContext("2d");
+
+const ui = {
+    state: null,
+
+    mode: "none",
+    isEditingParam: false,
+
+    showPcd: true,
+    showRoute: true,
+    showRobot: true,
+    showDrivableAreas: true,
+
+    view: {
+        scale: 40,
+        yaw: -0.85,
+        pitch: 0.55,
+        offsetX: 0,
+        offsetY: 0,
+        centerX: 0,
+        centerY: 0,
+        centerZ: 0
+    },
+
+    drag: {
+        panning: false,
+        rotating: false,
+        moved: false,
+        lastX: 0,
+        lastY: 0
+    },
+
+    pendingRouteZIdx: null,
+    pendingDeleteRouteIdx: null,
+    pendingPlanGoal: null,
+    pendingInitialPose: null,
+    hoverWorld: null,
+    hoverRouteIdx: null,
+
+    drawingRoutePoints: [],   // 手绘路线点
+    drawingAreaPoints: [],
+    drawingAreaPlaneZ: null,
+    drawingStairPoints: [],
+    committedRouteBlockCount: 0,  // 已提交的路线段起始点数（防止修改已确认部分）
+    curveMode: false,
+    curveSamplesPerSegment: 16,
+    cachedZRange: {min: 0, max: 1, valid: false},  // 点云 Z 范围缓存
+    useZFilter: false,
+    activeZMin: 0.0,
+    activeZMax: 1.0,
+    zFilterInitialized: false,
+    routeEditMinZ: -5.0,
+    routeEditMaxZ: 5.0,
+    routeEditDragging: false,
+
+    ws: null,
+    fullRefreshBusy: false,
+    revisions: {map:-1, route:-1, stop:-1, area:-1},
+    _pointsNormalized: null, _pointsRevision: 0,
+    _infoCache: {}
+};
+async function api(url, method="GET", data=null, isForm=false){
+    const opt = {method};
+    if(data){
+        if(isForm){
+            opt.body = data;
+        }else{
+            opt.headers = {"Content-Type":"application/json"};
+            opt.body = JSON.stringify(data);
+        }
+    }
+    const res = await fetch(url, opt);
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const ct = res.headers.get("content-type") || "";
+    if(ct.includes("application/json")) return await res.json();
+    return await res.text();
+}
+
+function showToolPage(name){
+    document.querySelectorAll(".tool-page").forEach(el=>el.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(el=>el.classList.remove("active"));
+    const page = document.getElementById("toolPage" + name.charAt(0).toUpperCase() + name.slice(1));
+    if(page) page.classList.add("active");
+    const btn = document.querySelector(`.tab-btn[data-tool-page="${name}"]`);
+    if(btn) btn.classList.add("active");
+}
+
+function getRevisions(state){
+    const r = (state && state.revisions) ? state.revisions : {};
+    return {
+        map: Number(r.map || 0),
+        route: Number(r.route || 0),
+        area: Number(r.area || 0)
+    };
+}
+
+function setStatus(t){
+    var cls=t&&t.indexOf('错')>=0?'offline':'online';
+    document.getElementById("topStatus").innerHTML='<span class="status-dot '+cls+'"></span>状态：'+t;
+    document.getElementById("statusText").innerText=t;
+    document.getElementById("canvasTip").innerText="提示："+t;
+}
+
+function setBackendStatus(t){
+    var cls=t&&t.indexOf('错')>=0?'offline':'online';
+    document.getElementById("topStatus").innerHTML='<span class="status-dot '+cls+'"></span>状态：'+t;
+    document.getElementById("statusText").innerText=t;
+    if(ui.mode==="none"){
+        document.getElementById("canvasTip").innerText="提示："+t;
+    }
+}
+
+function setMode(mode){
+    if(ui.mode === mode){
+        cancelCurrentMode();
+        return;
+    }
+
+    ui.mode = mode;
+    resetPendingActions();
+
+    if(mode === "draw_route" || mode === "draw_curve"){
+        ui.curveMode = mode === "draw_curve";
+        // 如果已有路线，自动加载为手绘基础（支持继续编辑）
+        const existing = getRoutePoints();
+        if(existing.length > 0 && ui.drawingRoutePoints.length === 0){
+            ui.drawingRoutePoints = existing.map(p => ({x:p.x, y:p.y, z:p.z}));
+        }
+        const base = ui.drawingRoutePoints.length;
+        const label = ui.curveMode ? "曲线绘制" : "手绘路线";
+        setStatus(base > 0
+            ? `已加载现有路线(${base}点)，在终点附近点击继续编辑`
+            : `点击画布添加路线点（${label}，自动拾取点云高度），完成后点击「确认提交」`);
+    }else if(mode === "edit_route_z"){
+        ui.curveMode = false;
+        if(ui.drawingRoutePoints.length === 0){
+            const existing = getRoutePoints();
+            if(existing.length > 0){
+                ui.drawingRoutePoints = existing.map(p => ({x:p.x, y:p.y, z:p.z}));
+                // 默认选中终点
+                if(ui.drawingRoutePoints.length > 0){
+                    ui.pendingRouteZIdx = ui.drawingRoutePoints.length - 1;
+                }
+            }
+        }
+        setStatus("点击已有路线点以编辑其 Z 高度（默认选中终点）");
+    }else if(mode === "delete_route_segment"){
+        ui.curveMode = false;
+        ui.pendingDeleteRouteIdx = null;
+        ui.hoverRouteIdx = null;
+        setStatus("点击路线选择删除区间起点，再点击第二个位置选择终点");
+    }else if(mode === "draw_drivable_area"){
+        ui.curveMode = false;
+        if(ui.drawingAreaPoints.length === 0) ui.drawingAreaPlaneZ = null;
+        setStatus("点击地图绘制可行驶区域边界，至少3个点，完成后点击「完成区域」");
+    }else if(mode === "delete_drivable_area"){
+        ui.curveMode = false;
+        setStatus("点击地图中的可行驶区域进行删除");
+    }else if(mode === "draw_stair_connector"){
+        ui.curveMode = false;
+        setStatus("沿楼梯、坡道或走廊中心线依次点击点云点，至少2个点，完成后点击「生成区域」");
+    }else if(mode === "plan_goal"){
+        ui.curveMode = false;
+        ui.pendingPlanGoal = null;
+        setStatus("先点击可行驶区域内的目标位置，再点击第二个点设置终点朝向");
+    }else if(mode === "set_initial_pose"){
+        ui.curveMode = false;
+        ui.pendingInitialPose = null;
+        setStatus("先点击地图设置位置，再点击第二个点设置朝向（发布/initialpose）");
+    }else{
+        ui.curveMode = false;
+        setStatus("已切换模式");
+    }
+
+    updateModeHint();
+    render();
+}
+
+function cancelCurrentMode(){
+    ui.mode = "none";
+    ui.curveMode = false;
+    // 保留 drawingRoutePoints，下次进入手绘模式可以继续编辑
+    ui.hoverWorld = null;
+    resetPendingActions();
+    updateModeHint();
+    updateRouteEditPanel();
+    setStatus("已退出手绘模式（路线点已保留）");
+    scheduleRender();
+}
+
+function clearDrawRoute(){
+    ui.drawingRoutePoints = [];
+    ui.committedRouteBlockCount = 0;  // 重置已提交的段数
+    ui.hoverWorld = null;
+    ui.pendingRouteZIdx = null;
+    ui.pendingDeleteRouteIdx = null;
+    ui.hoverRouteIdx = null;
+    if(ui.mode === "draw_route" || ui.mode === "draw_curve"){
+        updateModeHint();
+        setStatus("已清空手绘路线，从零开始绘制");
+    }
+    updateRouteEditPanel();
+    scheduleRender();
+}
+
+function undoDrawRoutePoint(){
+    if(ui.drawingRoutePoints.length === 0) return;
+    ui.drawingRoutePoints.pop();
+    ui.hoverWorld = null;
+    if(ui.mode !== "draw_route" && ui.mode !== "draw_curve") ui.mode = "draw_route";
+    setStatus(`已撤销，剩余 ${ui.drawingRoutePoints.length} 个点`);
+    updateModeHint();
+    scheduleRender();
+}
+
+async function confirmDrawnRoute(){
+    if(ui.drawingRoutePoints.length < 2){
+        alert("路线点不足，至少需要2个点");
+        return;
+    }
+
+    let pts = ui.drawingRoutePoints.map(p => ({
+        x: parseFloat(p.x.toFixed(4)),
+        y: parseFloat(p.y.toFixed(4)),
+        z: parseFloat(p.z.toFixed(4))
+    }));
+
+    if(ui.curveMode){
+        pts = buildCurvePoints(pts, ui.curveSamplesPerSegment).map(p => ({
+            x: parseFloat(p.x.toFixed(4)),
+            y: parseFloat(p.y.toFixed(4)),
+            z: parseFloat(p.z.toFixed(4))
+        }));
+    }
+
+    try{
+        const d = await api("/api/route/set-points", "POST", {points: pts});
+        if(!d.ok){
+            alert(d.message || "提交路线失败");
+            return;
+        }
+
+        // 更新已提交的路线点数
+        ui.committedRouteBlockCount = ui.drawingRoutePoints.length;
+        
+        ui.drawingRoutePoints = [];
+        ui.hoverWorld = null;
+        ui.mode = "none";
+        updateModeHint();
+        await refreshState(true);
+        setStatus(d.message || "手绘路线已提交");
+    }catch(e){
+        alert("提交路线失败: " + e.message);
+    }
+}
+
+function undoDrivableAreaPoint(){
+    if(ui.drawingAreaPoints.length === 0) return;
+    ui.drawingAreaPoints.pop();
+    ui.hoverWorld = null;
+    updateDrivableAreaInfo();
+    updateModeHint();
+    scheduleRender();
+}
+
+async function finishDrivableArea(){
+    if(ui.drawingAreaPoints.length < 3){
+        alert("可行驶区域至少需要3个点");
+        return;
+    }
+
+    const planeZ = getActivePlanningPlaneZ();
+    const zVals = ui.drawingAreaPoints.map(p => Number(p.z || planeZ));
+    const zMin = ui.useZFilter ? ui.activeZMin : Math.min(...zVals);
+    const zMax = ui.useZFilter ? ui.activeZMax : Math.max(...zVals);
+    const areaName = `Area${getDrivableAreas().length + 1}`;
+
+    const points = ui.drawingAreaPoints.map(p => ({
+        x: parseFloat(p.x.toFixed(4)),
+        y: parseFloat(p.y.toFixed(4)),
+        z: parseFloat(Number(p.z || planeZ).toFixed(4))
+    }));
+
+    const d = await api("/api/drivable/add", "POST", {
+        name: areaName,
+        z_min: zMin,
+        z_max: zMax,
+        points: points
+    });
+    if(!d.ok){
+        alert(d.message || "添加可行驶区域失败");
+        return;
+    }
+
+    ui.drawingAreaPoints = [];
+    ui.drawingAreaPlaneZ = null;
+    ui.drawingStairPoints = [];
+    ui.hoverWorld = null;
+    applyDrivableAreasResponse(d);
+    setStatus("已添加可行驶区域");
+    ui.mode = "draw_drivable_area";
+    updateModeHint();
+    updateDrivableAreaInfo();
+    fitView();
+    scheduleRender();
+}
+
+async function deleteSelectedDrivableArea(){
+    const sel = document.getElementById("drivableAreaSelect");
+    let idx = sel && sel.value !== "" ? parseInt(sel.value, 10) : NaN;
+    if(!Number.isInteger(idx)){
+        const input = prompt("请输入要删除的区域编号（从 0 开始）", "0");
+        if(input === null) return;
+        idx = parseInt(input, 10);
+    }
+    await deleteDrivableAreaByIndex(idx);
+}
+
+async function deleteLastDrivableArea(){
+    const areas = getDrivableAreas();
+    if(areas.length === 0){
+        alert("当前没有可删除的可行驶区域");
+        return;
+    }
+    await deleteDrivableAreaByIndex(areas.length - 1);
+}
+
+async function deleteDrivableAreaByIndex(idx){
+    const areas = getDrivableAreas();
+    const area = areas[idx];
+    if(!Number.isInteger(idx) || idx < 0 || idx >= areas.length || !area){
+        alert("选中的区域不存在");
+        return;
+    }
+    setStatus(`正在删除区域 ${idx}: ${area.name || "Area"} ...`);
+    const d = await api("/api/drivable/delete-index", "POST", {index: idx});
+    if(!d.ok){
+        alert(d.message || "删除可行驶区域失败");
+        return;
+    }
+    ui.drawingAreaPoints = [];
+    ui.drawingAreaPlaneZ = null;
+    ui.hoverWorld = null;
+    applyDrivableAreasResponse(d);
+    updateDrivableAreaInfo();
+    setStatus(d.message || `已删除区域 ${idx}`);
+    fitView();
+    scheduleRender();
+}
+
+async function clearDrivableAreas(){
+    setStatus("正在清空所有可行驶区域...");
+    const d = await api("/api/drivable/clear", "POST");
+    if(!d.ok){
+        alert(d.message || "清空可行驶区域失败");
+        return;
+    }
+    ui.drawingAreaPoints = [];
+    ui.drawingAreaPlaneZ = null;
+    ui.hoverWorld = null;
+    applyDrivableAreasResponse(d);
+    updateDrivableAreaInfo();
+    setStatus(d.message || "已清空可行驶区域");
+    scheduleRender();
+}
+
+function undoStairConnectorPoint(){
+    if(ui.drawingStairPoints.length === 0) return;
+    ui.drawingStairPoints.pop();
+    ui.hoverWorld = null;
+    updateConnectorInfo();
+    updateModeHint();
+    scheduleRender();
+}
+
+async function finishStairConnector(){
+    if(ui.drawingStairPoints.length < 2){
+        alert("中心线至少需要2个点");
+        return;
+    }
+
+    const width = Math.max(0.10, numInput("centerlineAreaWidth", 1.20));
+    const zMargin = Math.max(0.0, numInput("centerlineAreaZMargin", 0.20));
+    const sampleGap = Math.max(0.05, numInput("centerlineAreaSampleGap", 0.25));
+    const fitRadius = Math.max(0.05, numInput("centerlineAreaFitRadius", 0.35));
+    const area = buildAreaFromCenterline(ui.drawingStairPoints, width, zMargin, sampleGap, fitRadius);
+    if(!area){
+        alert("中心线太短，无法生成区域");
+        return;
+    }
+
+    const d = await api("/api/drivable/add", "POST", area);
+    if(!d.ok){
+        alert(d.message || "生成可行驶区域失败");
+        return;
+    }
+
+    ui.drawingStairPoints = [];
+    ui.hoverWorld = null;
+    applyDrivableAreasResponse(d);
+    setStatus("已根据中心线生成可行驶区域");
+    ui.mode = "draw_stair_connector";
+    updateModeHint();
+    updateDrivableAreaInfo();
+    fitView();
+    scheduleRender();
+}
+
+function clearCenterlinePoints(){
+    ui.drawingStairPoints = [];
+    ui.hoverWorld = null;
+    updateConnectorInfo();
+    updateModeHint();
+    scheduleRender();
+}
+
+function numInput(id, fallback){
+    const el = document.getElementById(id);
+    if(!el) return fallback;
+    const v = parseFloat(el.value);
+    return Number.isFinite(v) ? v : fallback;
+}
+
+function intInput(id, fallback){
+    const el = document.getElementById(id);
+    if(!el) return fallback;
+    const v = parseInt(el.value, 10);
+    return Number.isFinite(v) ? v : fallback;
+}
+
+function resampleCenterlinePoints(points, gap){
+    const pts = points.map(pointFromAny);
+    if(pts.length < 2) return null;
+    const out = [pts[0]];
+    for(let i = 0; i < pts.length - 1; i++){
+        const a = pts[i];
+        const b = pts[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dz = b.z - a.z;
+        const len = Math.hypot(dx, dy);
+        const steps = Math.max(1, Math.ceil(len / gap));
+        for(let s = 1; s <= steps; s++){
+            const t = s / steps;
+            out.push({
+                x: a.x + dx * t,
+                y: a.y + dy * t,
+                z: a.z + dz * t
+            });
+        }
+    }
+    return out;
+}
+
+function cloudZNear(x, y, z, radius, zWindow){
+    const pts = getAllMapPoints();
+    if(pts.length === 0) return null;
+    const r2 = radius * radius;
+    const step = pts.length > 80000 ? Math.ceil(pts.length / 80000) : 1;
+    let weightedZ = 0;
+    let weightSum = 0;
+    for(let i = 0; i < pts.length; i += step){
+        const p = pts[i];
+        const dz = Math.abs(Number(p.z || 0) - z);
+        if(dz > zWindow) continue;
+        const dx = Number(p.x || 0) - x;
+        const dy = Number(p.y || 0) - y;
+        const d2 = dx * dx + dy * dy;
+        if(d2 > r2) continue;
+        const w = 1.0 / Math.max(0.03, Math.sqrt(d2));
+        weightedZ += Number(p.z || 0) * w;
+        weightSum += w;
+    }
+    return weightSum > 0 ? weightedZ / weightSum : null;
+}
+
+function fitPointZToCloudSurface(p, radius, zWindow){
+    const z = cloudZNear(p.x, p.y, p.z, radius, zWindow);
+    return {
+        x: parseFloat(p.x.toFixed(4)),
+        y: parseFloat(p.y.toFixed(4)),
+        z: parseFloat((z === null ? p.z : z).toFixed(4))
+    };
+}
+
+function smoothCenterlineZ(points, passes=2){
+    let out = points.map(pointFromAny);
+    for(let pass = 0; pass < passes; pass++){
+        out = out.map((p, i)=>{
+            if(i === 0 || i === out.length - 1) return p;
+            const prev = out[i - 1];
+            const next = out[i + 1];
+            return {
+                x: p.x,
+                y: p.y,
+                z: prev.z * 0.25 + p.z * 0.5 + next.z * 0.25
+            };
+        });
+    }
+    return out;
+}
+
+function boundaryPointFromCenter(center, nx, ny, offset){
+    return {
+        x: center.x + nx * offset,
+        y: center.y + ny * offset,
+        z: center.z
+    };
+}
+
+function buildAreaFromCenterline(centerline, width, zMargin, sampleGap=0.25, fitRadius=0.35){
+    let pts = resampleCenterlinePoints(centerline, sampleGap);
+    if(!pts || pts.length < 2) return null;
+
+    const half = width * 0.5;
+    const zWindow = Math.max(0.35, zMargin + sampleGap * 1.5);
+    pts = smoothCenterlineZ(pts.map(p => fitPointZToCloudSurface(p, fitRadius, zWindow)), 2);
+
+    const left = [];
+    const right = [];
+
+    for(let i = 0; i < pts.length; i++){
+        const prev = pts[Math.max(0, i - 1)];
+        const next = pts[Math.min(pts.length - 1, i + 1)];
+        let dx = next.x - prev.x;
+        let dy = next.y - prev.y;
+        let len = Math.hypot(dx, dy);
+        if(len < 1e-9 && i > 0){
+            dx = pts[i].x - pts[i - 1].x;
+            dy = pts[i].y - pts[i - 1].y;
+            len = Math.hypot(dx, dy);
+        }
+        if(len < 1e-9) return null;
+
+        const nx = -dy / len;
+        const ny = dx / len;
+        left.push(boundaryPointFromCenter(pts[i], nx, ny, half));
+        right.push(boundaryPointFromCenter(pts[i], nx, ny, -half));
+    }
+
+    const polygon = left.concat(right.reverse()).map(p => ({
+        x: parseFloat(p.x.toFixed(4)),
+        y: parseFloat(p.y.toFixed(4)),
+        z: parseFloat(Number(p.z || 0).toFixed(4))
+    }));
+    const zVals = pts.map(p => Number(p.z || 0));
+    return {
+        type: "corridor",
+        name: `CenterlineArea${getDrivableAreas().length + 1}`,
+        z_min: Math.min(...zVals) - zMargin,
+        z_max: Math.max(...zVals) + zMargin,
+        width: width,
+        centerline: pts.map(p => ({
+            x: parseFloat(p.x.toFixed(4)),
+            y: parseFloat(p.y.toFixed(4)),
+            z: parseFloat(Number(p.z || 0).toFixed(4))
+        })),
+        points: polygon
+    };
+}
+
+async function planToGoalPoint(goal, finalYawDeg=null){
+    const resolution = parseFloat(document.getElementById("planResolution").value || "0.20");
+    const robotRadius = parseFloat(document.getElementById("planRobotRadius").value || "0.15");
+    const payload = {
+        goal: {
+            x: goal.x,
+            y: goal.y,
+            z: goal.z
+        },
+        resolution: Number.isNaN(resolution) ? 0.20 : resolution,
+        robot_radius: Number.isNaN(robotRadius) ? 0.15 : robotRadius
+    };
+    if(finalYawDeg !== null){
+        payload.final_yaw_deg = finalYawDeg;
+    }
+
+    const pose = ui.state && ui.state.current_pose ? pointFromAny(ui.state.current_pose) : null;
+    const crossFloor = pose ? Math.abs(Number(pose.z || 0) - Number(goal.z || 0)) > 0.45 : false;
+    if(ui.useZFilter && !crossFloor){
+        payload.z_min = ui.activeZMin;
+        payload.z_max = ui.activeZMax;
+    }
+
+    const d = await api("/api/drivable/plan-to-goal", "POST", payload);
+    if(!d.ok){
+        const msg = d.message || "自动规划失败";
+        alert(msg);
+        setStatus("自动规划失败: " + msg);
+        ui.pendingPlanGoal = null;
+        ui.hoverWorld = null;
+        ui.mode = "none";
+        updateModeHint();
+        scheduleRender();
+        return false;
+    }
+
+    ui.pendingPlanGoal = null;
+    ui.hoverWorld = null;
+    ui.mode = "none";
+    ui.state.route_polyline = (d.points || []).map(p => ({x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0)}));
+    ui.revisions.route = (ui.revisions.route || 0) + 1;
+    updateModeHint();
+    scheduleRender();
+    setStatus(d.message || "自动规划完成");
+    return true;
+}
+
+async function publishInitialPose(x, y, z, yawDeg){
+    const d = await api("/api/ros/initialpose", "POST", {
+        x: Number(x), y: Number(y), z: Number(z), yaw_deg: Number(yawDeg)
+    });
+    if(!d.ok){
+        alert(d.message || "发布initialpose失败");
+        setStatus("发布initialpose失败: " + (d.message || "未知错误"));
+        return;
+    }
+    ui.pendingInitialPose = null;
+    ui.hoverWorld = null;
+    ui.mode = "none";
+    updateModeHint();
+    scheduleRender();
+    setStatus(`已发布initialpose (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}, yaw=${yawDeg.toFixed(1)}°)`);
+}
+
+function updateRouteEditPanel(){
+    const el = document.getElementById("routeEditPanel");
+    if(!el) return;
+}
+
+function updateModeHint(){
+    document.getElementById("modeText").innerText = "当前模式：" + ui.mode;
+    let tip = "提示：请选择一个模式。";
+
+    if(ui.mode === "draw_route" || ui.mode === "draw_curve"){
+        const base = ui.drawingRoutePoints.length;
+        const label = ui.mode === "draw_curve" ? "曲线" : "直线";
+        if(base === 0){
+            tip = `提示：请点击地图开始绘制${label}路线。`;
+        }else{
+            tip = `提示：共 ${base} 个点（含已加载的旧路线），继续点击添加，或点击「确认提交」完成。`;
+        }
+    }else if(ui.mode === "edit_route_z"){
+        tip = "提示：点击已添加路线点以编辑其高度。";
+    }else if(ui.mode === "delete_route_segment"){
+        tip = ui.pendingDeleteRouteIdx === null
+            ? "提示：点击绿色路线选择要删除区间的起点。"
+            : `提示：已选中第 ${ui.pendingDeleteRouteIdx + 1} 个路线点，请点击终点确认删除区间。`;
+    }else if(ui.mode === "draw_drivable_area"){
+        const zText = ui.drawingAreaPlaneZ === null || ui.drawingAreaPlaneZ === undefined
+            ? "未锁定"
+            : `${ui.drawingAreaPlaneZ.toFixed(2)}m`;
+        tip = `提示：正在绘制可行驶区域，当前 ${ui.drawingAreaPoints.length} 个点，绘制高度 ${zText}。`;
+    }else if(ui.mode === "delete_drivable_area"){
+        tip = "提示：点击地图中的可行驶区域进行删除。";
+    }else if(ui.mode === "draw_stair_connector"){
+        tip = `提示：正在标定中心线，当前 ${ui.drawingStairPoints.length} 个点。`;
+    }else if(ui.mode === "plan_goal"){
+        tip = ui.pendingPlanGoal
+            ? "提示：已选中目标位置，请第二次点击设置终点朝向。"
+            : "提示：点击可行驶区域内的目标位置。";
+    }else if(ui.mode === "set_initial_pose"){
+        tip = ui.pendingInitialPose
+            ? "提示：已选中位置，请第二次点击设置朝向。"
+            : "提示：点击地图设置初始位置。";
+    }
+
+    document.getElementById("modeHint").innerText = tip;
+}
+
+function resetPendingActions(){
+    ui.pendingRouteZIdx = null;
+    ui.pendingDeleteRouteIdx = null;
+    ui.pendingPlanGoal = null;
+    ui.pendingInitialPose = null;
+    ui.hoverWorld = null;
+    ui.hoverRouteIdx = null;
+    if(ui.drawingAreaPoints.length === 0) ui.drawingAreaPlaneZ = null;
+}
+
+function pointFromAny(p){
+    if(!p) return {x:0, y:0, z:0};
+    if(Array.isArray(p)){
+        return {
+            x: Number(p[0] || 0),
+            y: Number(p[1] || 0),
+            z: Number(p[2] || 0)
+        };
+    }
+    return {
+        x: Number(p.x || 0),
+        y: Number(p.y || 0),
+        z: Number(p.z || 0)
+    };
+}
+
+function _normalizeMapPoints(){
+    const st = ui.state;
+    if(!st){ui._pointsNormalized = null; ui._pointsRevision = 0; return;}
+    if(Array.isArray(st.points_xyz) && st.points_xyz.length > 0){
+        const len = st.points_xyz.length;
+        if(ui._pointsNormalized && ui._pointsRevision === len) return;
+        ui._pointsNormalized = new Array(len);
+        for(let i=0;i<len;i++) ui._pointsNormalized[i]=pointFromAny(st.points_xyz[i]);
+        ui._pointsRevision=len;
+    }else if(Array.isArray(st.points_xy) && st.points_xy.length > 0){
+        const len = st.points_xy.length;
+        if(ui._pointsNormalized && ui._pointsRevision === len) return;
+        ui._pointsNormalized = new Array(len);
+        for(let i=0;i<len;i++){
+            const p=st.points_xy[i];
+            ui._pointsNormalized[i]={x:Number(p[0]||0),y:Number(p[1]||0),z:0};
+        }
+        ui._pointsRevision=len;
+    }else{ui._pointsNormalized=null;ui._pointsRevision=0;}
+}
+
+function getAllMapPoints(){
+    return ui._pointsNormalized || [];
+}
+
+function getMapZRange(){
+    if(ui.cachedZRange.valid) return ui.cachedZRange;
+
+    const pts = getAllMapPoints();
+    if(pts.length === 0){
+        ui.cachedZRange = {min: 0.0, max: 1.0, valid: false};
+        return ui.cachedZRange;
+    }
+
+    let lo = Infinity;
+    let hi = -Infinity;
+    for(const p of pts){
+        const z = Number(p.z || 0);
+        if(z < lo) lo = z;
+        if(z > hi) hi = z;
+    }
+
+    if(!Number.isFinite(lo) || !Number.isFinite(hi)){
+        lo = 0.0;
+        hi = 1.0;
+    }
+    if(Math.abs(hi - lo) < 1e-6){
+        hi = lo + 0.1;
+    }
+
+    ui.cachedZRange = {min: lo, max: hi, valid: true};
+    return ui.cachedZRange;
+}
+
+function normalizeZFilterBounds(){
+    if(ui.activeZMin > ui.activeZMax){
+        const t = ui.activeZMin;
+        ui.activeZMin = ui.activeZMax;
+        ui.activeZMax = t;
+    }
+}
+
+function pointInActiveZ(p){
+    if(!ui.useZFilter) return true;
+    const z = Number((p && p.z) || 0);
+    return z >= ui.activeZMin && z <= ui.activeZMax;
+}
+
+function initializeZFilterFromMap(force=false){
+    const range = getMapZRange();
+    if(!range.valid) return;
+    if(ui.zFilterInitialized && !force) return;
+
+    ui.activeZMin = range.min;
+    ui.activeZMax = range.max;
+    ui.zFilterInitialized = true;
+    syncZFilterInputs();
+}
+
+function syncZFilterInputs(){
+    const enabled = document.getElementById("zFilterEnabled");
+    const minInput = document.getElementById("zFilterMin");
+    const maxInput = document.getElementById("zFilterMax");
+    const info = document.getElementById("zFilterInfo");
+
+    if(enabled) enabled.checked = ui.useZFilter;
+    if(minInput) minInput.value = ui.activeZMin.toFixed(2);
+    if(maxInput) maxInput.value = ui.activeZMax.toFixed(2);
+
+    if(info){
+        const range = getMapZRange();
+        const mode = ui.useZFilter
+            ? `当前层: ${ui.activeZMin.toFixed(2)} ~ ${ui.activeZMax.toFixed(2)} m`
+            : "当前层: 全部高度";
+        info.innerText = range.valid
+            ? `点云高度范围: ${range.min.toFixed(2)} ~ ${range.max.toFixed(2)} m | ${mode}`
+            : `点云高度范围: - | ${mode}`;
+    }
+}
+
+function applyZFilterInputs(){
+    const enabled = document.getElementById("zFilterEnabled");
+    const minInput = document.getElementById("zFilterMin");
+    const maxInput = document.getElementById("zFilterMax");
+
+    ui.useZFilter = !!(enabled && enabled.checked);
+    const minVal = parseFloat(minInput ? minInput.value : ui.activeZMin);
+    const maxVal = parseFloat(maxInput ? maxInput.value : ui.activeZMax);
+    if(Number.isNaN(minVal) || Number.isNaN(maxVal)){
+        alert("请输入有效的 Z 高度范围");
+        return;
+    }
+
+    ui.activeZMin = minVal;
+    ui.activeZMax = maxVal;
+    normalizeZFilterBounds();
+    ui.zFilterInitialized = true;
+    syncZFilterInputs();
+    fitView();
+}
+
+function useFullZRange(){
+    initializeZFilterFromMap(true);
+    ui.useZFilter = false;
+    syncZFilterInputs();
+    fitView();
+}
+
+function nudgeZFilter(direction){
+    const range = getMapZRange();
+    if(!range.valid) return;
+
+    normalizeZFilterBounds();
+    const currentSpan = Math.max(0.1, ui.activeZMax - ui.activeZMin);
+    const step = currentSpan * 0.85;
+    ui.activeZMin += direction * step;
+    ui.activeZMax += direction * step;
+
+    if(ui.activeZMin < range.min){
+        ui.activeZMin = range.min;
+        ui.activeZMax = range.min + currentSpan;
+    }
+    if(ui.activeZMax > range.max){
+        ui.activeZMax = range.max;
+        ui.activeZMin = range.max - currentSpan;
+    }
+
+    ui.activeZMin = Math.max(range.min, ui.activeZMin);
+    ui.activeZMax = Math.min(range.max, ui.activeZMax);
+    ui.useZFilter = true;
+    ui.zFilterInitialized = true;
+    syncZFilterInputs();
+    fitView();
+}
+
+function getRoutePoints(){
+    if(!ui.state || !Array.isArray(ui.state.route_polyline)) return [];
+    return ui.state.route_polyline.map(pointFromAny);
+}
+
+function getRemainingRoutePoints(){
+    const full = getRoutePoints();
+    if(full.length < 2) return [];
+    if(!ui.state.nav || !ui.state.nav.is_auto_moving) return full;
+    const idx = Math.max(0, (ui.state.nav.nav_progress_idx || 0));
+    if(idx >= full.length) return full;
+    const result = full.slice(idx);
+    if(result.length < 2) return full;
+    return result;
+}
+
+function getDrivableAreas(){
+    if(!ui.state || !Array.isArray(ui.state.drivable_areas)) return [];
+    return ui.state.drivable_areas;
+}
+
+function applyDrivableAreasResponse(d){
+    if(!d || !Array.isArray(d.drivable_areas)) return false;
+    if(!ui.state) ui.state = {};
+    ui.state.drivable_areas = d.drivable_areas;
+    if(!ui.state.revisions) ui.state.revisions = {map:0, route:0, area:0};
+    if(d.area_revision !== undefined){
+        ui.state.revisions.area = Number(d.area_revision || 0);
+        ui.revisions.area = Number(d.area_revision || 0);
+    }
+    ui.state.area_count = d.area_count !== undefined ? Number(d.area_count || 0) : d.drivable_areas.length;
+    return true;
+}
+
+function getConnectors(){
+    if(!ui.state || !Array.isArray(ui.state.connectors)) return [];
+    return ui.state.connectors;
+}
+
+function updateConnectorInfo(){
+    const el = document.getElementById("connectorInfo");
+    const width = numInput("centerlineAreaWidth", 1.20);
+    if(el) el.innerText = `中心线：${ui.drawingStairPoints.length} 点 | 宽度：${width.toFixed(2)} m`;
+}
+
+function updateDrivableAreaInfo(){
+    const el = document.getElementById("drivableAreaInfo");
+    if(!el) return;
+    const areas = getDrivableAreas();
+    el.innerText = `区域：${areas.length} 个 | 绘制中：${ui.drawingAreaPoints.length} 点`;
+
+    const sel = document.getElementById("drivableAreaSelect");
+    if(sel){
+        const old = sel.value;
+        sel.innerHTML = "";
+        areas.forEach((area, i)=>{
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = `${i}: ${area.name || "Area"}  [${Number(area.z_min || 0).toFixed(2)} ~ ${Number(area.z_max || 0).toFixed(2)}]`;
+            sel.appendChild(opt);
+        });
+        if(old !== "" && Number(old) < areas.length) sel.value = old;
+    }
+
+    const list = document.getElementById("drivableAreaList");
+    if(list){
+        list.innerHTML = "";
+        areas.forEach((area, i)=>{
+            const row = document.createElement("div");
+            row.style.display = "flex";
+            row.style.alignItems = "center";
+            row.style.justifyContent = "space-between";
+            row.style.gap = "8px";
+            row.style.border = "1px solid #23314a";
+            row.style.borderRadius = "6px";
+            row.style.padding = "4px 6px";
+
+            const label = document.createElement("span");
+            label.textContent = `${i}: ${area.name || "Area"}  [${Number(area.z_min || 0).toFixed(2)} ~ ${Number(area.z_max || 0).toFixed(2)}]`;
+            label.style.cursor = "pointer";
+            label.onclick = ()=>{
+                const select = document.getElementById("drivableAreaSelect");
+                if(select) select.value = String(i);
+                scheduleRender();
+            };
+
+            const btn = document.createElement("button");
+            btn.className = "btn red";
+            btn.style.padding = "4px 8px";
+            btn.type = "button";
+            btn.dataset.deleteAreaIndex = String(i);
+            btn.textContent = "删除";
+            btn.onclick = ()=>deleteDrivableAreaByIndex(i);
+
+            row.appendChild(label);
+            row.appendChild(btn);
+            list.appendChild(row);
+        });
+    }
+    updateConnectorInfo();
+}
+
+function areaIntersectsActiveZ(area){
+    if(!ui.useZFilter) return true;
+    const zMin = Number(area.z_min ?? area.z ?? 0);
+    const zMax = Number(area.z_max ?? area.z ?? zMin);
+    return zMax >= ui.activeZMin && zMin <= ui.activeZMax;
+}
+
+function areaDisplayZ(area){
+    const pts = (area.points || []).map(pointFromAny);
+    if(pts.length > 0){
+        return pts.reduce((sum, p)=>sum + Number(p.z || 0), 0) / pts.length;
+    }
+    if(Number.isFinite(Number(area.z_min)) && Number.isFinite(Number(area.z_max))){
+        return (Number(area.z_min) + Number(area.z_max)) * 0.5;
+    }
+    return getActivePlanningPlaneZ();
+}
+
+function getAreaDisplayPoints(area){
+    return (area.points || []).map(pointFromAny);
+}
+
+function pointInPolygon2D(x, y, points){
+    if(!points || points.length < 3) return false;
+    let inside = false;
+    let j = points.length - 1;
+    for(let i = 0; i < points.length; i++){
+        const pi = points[i];
+        const pj = points[j];
+        const yi = Number(pi.y || 0);
+        const yj = Number(pj.y || 0);
+        const xi = Number(pi.x || 0);
+        const xj = Number(pj.x || 0);
+        if((yi > y) !== (yj > y)){
+            const xCross = (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi;
+            if(x < xCross) inside = !inside;
+        }
+        j = i;
+    }
+    return inside;
+}
+
+function findDrivableAreaIndexAtCanvasPoint(sx, sy){
+    const areas = getDrivableAreas();
+    for(let i = areas.length - 1; i >= 0; i--){
+        const area = areas[i];
+        if(!areaIntersectsActiveZ(area)) continue;
+        const pts = getAreaDisplayPoints(area);
+        if(pts.length < 3) continue;
+        const projected = pts.map(projectPoint);
+        if(pointInPolygon2D(sx, sy, projected)) return i;
+    }
+    return null;
+}
+
+function getConnectorPoints(connector){
+    return (connector.points || []).map(pointFromAny);
+}
+
+function getViewMatrix(){
+    const cy = Math.cos(ui.view.yaw);
+    const sy = Math.sin(ui.view.yaw);
+    const cp = Math.cos(ui.view.pitch);
+    const sp = Math.sin(ui.view.pitch);
+
+    return {
+        r00: cy,      r01: -sy,     r02: 0.0,
+        r10: cp*sy,   r11: cp*cy,   r12: -sp,
+        r20: sp*sy,   r21: sp*cy,   r22: cp
+    };
+}
+
+function projectPoint(p, _m){
+    const m = _m || getViewMatrix();
+
+    const x = p.x - ui.view.centerX;
+    const y = p.y - ui.view.centerY;
+    const z = p.z - ui.view.centerZ;
+
+    const vx = m.r00*x + m.r01*y + m.r02*z;
+    const vy = m.r10*x + m.r11*y + m.r12*z;
+    const vz = m.r20*x + m.r21*y + m.r22*z;
+
+    return {
+        x: canvas.width / 2 + ui.view.offsetX + vx * ui.view.scale,
+        y: canvas.height / 2 + ui.view.offsetY - vz * ui.view.scale,
+        depth: vy,
+        vx: vx,
+        vy: vy,
+        vz: vz
+    };
+}
+
+function screenToWorldOnPlane(sx, sy, planeZ=0.0){
+    const m = getViewMatrix();
+    const px = (sx - (canvas.width / 2 + ui.view.offsetX)) / ui.view.scale;
+    const pz = - (sy - (canvas.height / 2 + ui.view.offsetY)) / ui.view.scale;
+
+    const vz = planeZ - ui.view.centerZ;
+
+    const a00 = m.r00, a01 = m.r01;
+    const a10 = m.r20, a11 = m.r21;
+    const b0 = px - m.r02 * vz;
+    const b1 = pz - m.r22 * vz;
+
+    const det = a00 * a11 - a01 * a10;
+    if(Math.abs(det) < 1e-9) return null;
+
+    const vx = (b0 * a11 - b1 * a01) / det;
+    const vy = (a00 * b1 - a10 * b0) / det;
+
+    return {
+        x: vx + ui.view.centerX,
+        y: vy + ui.view.centerY,
+        z: planeZ
+    };
+}
+
+// 点云拾取：从屏幕坐标找最近的点云点（用于手绘路线获取精确Z值）
+function pickNearestPointCloudPoint(sx, sy, maxScreenDist=30){
+    const allPts = getAllMapPoints();
+    if(allPts.length === 0) return null;
+
+    let best = null;
+    let bestDist = maxScreenDist * maxScreenDist;
+
+    // 为了性能，对大点云做随机采样检查
+    const step = allPts.length > 50000 ? Math.floor(allPts.length / 50000) : 1;
+
+    for(let i = 0; i < allPts.length; i += step){
+        if(!pointInActiveZ(allPts[i])) continue;
+        const sp = projectPoint(allPts[i]);
+        const d = (sp.x - sx) * (sp.x - sx) + (sp.y - sy) * (sp.y - sy);
+        if(d < bestDist){
+            bestDist = d;
+            best = allPts[i];
+        }
+    }
+
+    // 如果采样后找到候选点，在附近精细搜索
+    if(best && step > 1){
+        const refineRadius = step * 3;
+        const start = Math.max(0, allPts.indexOf(best) - refineRadius);
+        const end = Math.min(allPts.length, allPts.indexOf(best) + refineRadius);
+        for(let i = start; i < end; i++){
+            if(!pointInActiveZ(allPts[i])) continue;
+            const sp = projectPoint(allPts[i]);
+            const d = (sp.x - sx) * (sp.x - sx) + (sp.y - sy) * (sp.y - sy);
+            if(d < bestDist){
+                bestDist = d;
+                best = allPts[i];
+            }
+        }
+    }
+
+    return best ? {x: best.x, y: best.y, z: best.z} : null;
+}
+
+// 手绘路线预览高度：用于鼠标移动时的预览点
+function getDefaultDrawPlaneZ(){
+    if(ui.useZFilter){
+        return (ui.activeZMin + ui.activeZMax) * 0.5;
+    }
+    if(ui.cachedZRange.valid){
+        return (ui.cachedZRange.min + ui.cachedZRange.max) * 0.5;
+    }
+    const pts = getAllMapPoints();
+    if(pts.length > 0){
+        let sum = 0;
+        pts.forEach(p=>sum += p.z || 0);
+        return sum / pts.length;
+    }
+    return 0.0;
+}
+
+function getActivePlanningPlaneZ(){
+    if(ui.useZFilter){
+        if(ui.state && ui.state.current_pose && ui.state.current_pose.z !== undefined){
+            const z = Number(ui.state.current_pose.z || 0.0);
+            if(z >= ui.activeZMin && z <= ui.activeZMax) return z;
+        }
+        return (ui.activeZMin + ui.activeZMax) * 0.5;
+    }
+    if(ui.state && ui.state.current_pose && ui.state.current_pose.z !== undefined){
+        return Number(ui.state.current_pose.z || 0.0);
+    }
+    return getDefaultDrawPlaneZ();
+}
+
+function getDrawRouteHoverPoint(sx, sy){
+    const picked = pickNearestPointCloudPoint(sx, sy);
+    if(picked) return picked;
+    // 点云外回退到默认高度平面
+    return screenToWorldOnPlane(sx, sy, getDefaultDrawPlaneZ());
+}
+
+function getPlanningPointFromCanvas(sx, sy){
+    const picked = pickNearestPointCloudPoint(sx, sy, 35);
+    if(picked) return picked;
+    return screenToWorldOnPlane(sx, sy, getActivePlanningPlaneZ());
+}
+
+function getDrivableAreaPointFromCanvas(sx, sy){
+    if(ui.drawingAreaPlaneZ === null || ui.drawingAreaPlaneZ === undefined){
+        ui.drawingAreaPlaneZ = getActivePlanningPlaneZ();
+    }
+    return screenToWorldOnPlane(sx, sy, ui.drawingAreaPlaneZ);
+}
+
+function drawLine2D(a, b, color="#22c55e", lineW=2){
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+}
+
+function drawCircle2D(p, r, fill="#ef4444", stroke=null, lineW=1){
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    if(fill){
+        ctx.fillStyle = fill;
+        ctx.fill();
+    }
+    if(stroke){
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lineW;
+        ctx.stroke();
+    }
+}
+
+function drawText2D(text, x, y, color="#fff"){
+    ctx.fillStyle = color;
+    ctx.font = "12px Microsoft YaHei";
+    ctx.fillText(text, x, y);
+}
+
+function drawArrowProjected(p0, p1, color="#f59e0b", lineW=2){
+    const s0 = projectPoint(pointFromAny(p0));
+    const s1 = projectPoint(pointFromAny(p1));
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    ctx.moveTo(s0.x, s0.y);
+    ctx.lineTo(s1.x, s1.y);
+    ctx.stroke();
+
+    const dx = s1.x - s0.x;
+    const dy = s1.y - s0.y;
+    const len = Math.hypot(dx, dy);
+    if(len < 1e-6) return;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const ah = 8;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(s1.x, s1.y);
+    ctx.lineTo(s1.x - ux*ah - uy*ah*0.6, s1.y - uy*ah + ux*ah*0.6);
+    ctx.lineTo(s1.x - ux*ah + uy*ah*0.6, s1.y - uy*ah - ux*ah*0.6);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function buildCirclePoints3D(center, radius, zOffset, n=18){
+    const out = [];
+    for(let i=0;i<n;i++){
+        const a = i / n * Math.PI * 2;
+        out.push({
+            x: center.x + radius * Math.cos(a),
+            y: center.y + radius * Math.sin(a),
+            z: center.z + zOffset
+        });
+    }
+    return out;
+}
+
+function drawPolylineProjected(points, color="#22c55e", lineW=2){
+    if(!points || points.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    points.forEach((p, i)=>{
+        const sp = projectPoint(p);
+        if(i === 0) ctx.moveTo(sp.x, sp.y);
+        else ctx.lineTo(sp.x, sp.y);
+    });
+    ctx.stroke();
+}
+
+function drawFilteredPolylineProjected(points, color="#22c55e", lineW=2){
+    if(!points || points.length < 2) return;
+    if(!ui.useZFilter){
+        drawPolylineProjected(points, color, lineW);
+        return;
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineW;
+    ctx.beginPath();
+    let drawing = false;
+
+    for(let i = 0; i < points.length - 1; i++){
+        const aIn = pointInActiveZ(points[i]);
+        const bIn = pointInActiveZ(points[i + 1]);
+        if(!aIn && !bIn){
+            drawing = false;
+            continue;
+        }
+
+        const a = projectPoint(points[i]);
+        const b = projectPoint(points[i + 1]);
+        if(!drawing || !aIn){
+            ctx.moveTo(a.x, a.y);
+            drawing = true;
+        }
+        ctx.lineTo(b.x, b.y);
+        if(!bIn){
+            drawing = false;
+        }
+    }
+
+    ctx.stroke();
+}
+
+function findNearestDrawingRoutePointProjected(sx, sy, thresholdPx=24){
+    if(!ui.drawingRoutePoints || ui.drawingRoutePoints.length === 0) return null;
+    let bestIdx = null;
+    let bestDist = 1e18;
+    ui.drawingRoutePoints.forEach((p, i)=>{
+        if(!pointInActiveZ(p)) return;
+        const sp = projectPoint(p);
+        const d = Math.hypot(sx - sp.x, sy - sp.y);
+        if(d < bestDist){
+            bestDist = d;
+            bestIdx = i;
+        }
+    });
+    if(bestDist <= thresholdPx) return bestIdx;
+    return null;
+}
+
+function setDrawingRoutePointZ(idx, z){
+    if(idx === null || idx < 0 || idx >= ui.drawingRoutePoints.length) return;
+    ui.drawingRoutePoints[idx].z = Number(z);
+    ui.hoverWorld = null;
+
+    // 如果修改的是起点或终点，自动插值中间点
+    if(idx === 0 || idx === ui.drawingRoutePoints.length - 1){
+        interpolateRouteHeights();
+    }
+
+    updateRouteEditPanel();
+    scheduleRender();
+}
+
+function applyRouteEditChanges(){
+    if(ui.pendingRouteZIdx === null) return;
+    const zSlider = document.getElementById("routeEditZ");
+    const zValue = document.getElementById("routeEditZValue");
+    const zVal = parseFloat(zValue.value);
+    if(Number.isNaN(zVal)){
+        alert("请输入有效高度");
+        return;
+    }
+    setDrawingRoutePointZ(ui.pendingRouteZIdx, zVal);
+    setStatus(`已应用第 ${ui.pendingRouteZIdx + 1} 个点的新高度 ${zVal.toFixed(2)}`);
+}
+
+function clearRouteEditSelection(){
+    ui.pendingRouteZIdx = null;
+    ui.hoverWorld = null;
+    updateRouteEditPanel();
+    scheduleRender();
+}
+
+function autoAdjustRouteHeights(){
+    if(ui.drawingRoutePoints.length < 2) return;
+
+    // 自动从点云获取高度
+    const pts = getAllMapPoints();
+    if(pts.length === 0) return;
+
+    ui.drawingRoutePoints.forEach((p, i) => {
+        // 为每个路线点找到最近的点云点
+        let bestDist = 1e18;
+        let bestZ = p.z;
+        pts.forEach(pc => {
+            if(!pointInActiveZ(pc)) return;
+            const d = Math.hypot(p.x - pc.x, p.y - pc.y);
+            if(d < bestDist && d < 0.5){ // 0.5m 范围内
+                bestDist = d;
+                bestZ = pc.z;
+            }
+        });
+        ui.drawingRoutePoints[i].z = bestZ;
+    });
+
+    if(ui.pendingRouteZIdx !== null){
+        updateRouteEditPanel();
+    }
+    scheduleRender();
+    setStatus("已自动调整所有路线点高度到附近点云");
+}
+
+function interpolateRouteHeights(){
+    if(ui.drawingRoutePoints.length < 2) return;
+
+    // 简单线性插值中间点高度
+    const startIdx = 0;
+    const endIdx = ui.drawingRoutePoints.length - 1;
+    const startZ = ui.drawingRoutePoints[startIdx].z;
+    const endZ = ui.drawingRoutePoints[endIdx].z;
+
+    for(let i = startIdx + 1; i < endIdx; i++){
+        const t = (i - startIdx) / (endIdx - startIdx);
+        ui.drawingRoutePoints[i].z = startZ + t * (endZ - startZ);
+    }
+
+    if(ui.pendingRouteZIdx !== null){
+        updateRouteEditPanel();
+    }
+    scheduleRender();
+}
+
+function catmullRomPoint(p0, p1, p2, p3, t){
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+        x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2*p0.x - 5*p1.x + 4*p2.x - p3.x) * t2 + (-p0.x + 3*p1.x - 3*p2.x + p3.x) * t3),
+        y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2*p0.y - 5*p1.y + 4*p2.y - p3.y) * t2 + (-p0.y + 3*p1.y - 3*p2.y + p3.y) * t3),
+        z: 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * t + (2*p0.z - 5*p1.z + 4*p2.z - p3.z) * t2 + (-p0.z + 3*p1.z - 3*p2.z + p3.z) * t3)
+    };
+}
+
+function buildCurvePoints(points, samplesPerSegment=16){
+    if(!points || points.length < 2) return points ? points.slice() : [];
+    const out = [];
+    const n = points.length;
+    for(let i = 0; i < n - 1; i++){
+        const p0 = i === 0 ? points[i] : points[i - 1];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = i + 2 < n ? points[i + 2] : points[i + 1];
+
+        for(let j = 0; j < samplesPerSegment; j++){
+            const t = j / samplesPerSegment;
+            out.push(catmullRomPoint(p0, p1, p2, p3, t));
+        }
+    }
+    out.push(points[n - 1]);
+    return out;
+}
+
+function drawCurveProjected(points, color="#f97316", lineW=2){
+    const smooth = buildCurvePoints(points, ui.curveSamplesPerSegment);
+    drawPolylineProjected(smooth, color, lineW);
+}
+
+function drawClosedProjected(points, fillStyle=null, strokeStyle="#fff", lineW=1){
+    if(!points || points.length < 3) return;
+    ctx.beginPath();
+    points.forEach((p, i)=>{
+        const sp = projectPoint(p);
+        if(i === 0) ctx.moveTo(sp.x, sp.y);
+        else ctx.lineTo(sp.x, sp.y);
+    });
+    ctx.closePath();
+    if(fillStyle){
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+    }
+    if(strokeStyle){
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineW;
+        ctx.stroke();
+    }
+}
+
+function drawCylinderProjected(center, radius, height, fillColor="#2492ff", strokeColor="#ffffff"){
+    const base = buildCirclePoints3D(center, radius, 0.0, 18);
+    const top  = buildCirclePoints3D(center, radius, height, 18);
+
+    drawClosedProjected(base, "rgba(36,146,255,0.12)", strokeColor, 1);
+    drawClosedProjected(top, fillColor, strokeColor, 1);
+
+    [0, 4, 8, 12].forEach(i=>{
+        drawLine2D(projectPoint(base[i]), projectPoint(top[i]), strokeColor, 1);
+    });
+}
+
+function pointToSegmentDistance2D(px, py, ax, ay, bx, by){
+    const abx = bx - ax;
+    const aby = by - ay;
+    const ab2 = abx * abx + aby * aby;
+    if(ab2 < 1e-12){
+        const dx = px - ax, dy = py - ay;
+        return {
+            dist: Math.hypot(dx, dy),
+            t: 0,
+            x: ax,
+            y: ay
+        };
+    }
+    let t = ((px - ax)*abx + (py - ay)*aby) / ab2;
+    t = Math.max(0, Math.min(1, t));
+    const qx = ax + t * abx;
+    const qy = ay + t * aby;
+    return {
+        dist: Math.hypot(px - qx, py - qy),
+        t: t,
+        x: qx,
+        y: qy
+    };
+}
+
+function findNearestPointOnRouteProjected(sx, sy, thresholdPx=14){
+    const route = getRoutePoints();
+    if(route.length < 2) return null;
+
+    let best = null;
+    for(let i=0;i<route.length-1;i++){
+        if(!pointInActiveZ(route[i]) && !pointInActiveZ(route[i + 1])) continue;
+        const a = projectPoint(route[i]);
+        const b = projectPoint(route[i+1]);
+
+        const d = pointToSegmentDistance2D(sx, sy, a.x, a.y, b.x, b.y);
+        const t = d.t;
+        const point = {
+            x: route[i].x + t * (route[i+1].x - route[i].x),
+            y: route[i].y + t * (route[i+1].y - route[i].y),
+            z: route[i].z + t * (route[i+1].z - route[i].z)
+        };
+        if(!pointInActiveZ(point)) continue;
+
+        if(best === null || d.dist < best.dist){
+            best = {
+                dist: d.dist,
+                point: point,
+                segIdx: i,
+                t: t
+            };
+        }
+    }
+
+    if(best && best.dist <= thresholdPx) return best.point;
+    return null;
+}
+
+function findNearestRouteIndexProjected(sx, sy, thresholdPx=16){
+    const route = getRoutePoints();
+    if(route.length === 0) return null;
+
+    let bestIdx = null;
+    let bestDist = 1e18;
+
+    if(route.length >= 2){
+        for(let i = 0; i < route.length - 1; i++){
+            if(!pointInActiveZ(route[i]) && !pointInActiveZ(route[i + 1])) continue;
+
+            const a = projectPoint(route[i]);
+            const b = projectPoint(route[i + 1]);
+            const d = pointToSegmentDistance2D(sx, sy, a.x, a.y, b.x, b.y);
+            const point = {
+                x: route[i].x + d.t * (route[i + 1].x - route[i].x),
+                y: route[i].y + d.t * (route[i + 1].y - route[i].y),
+                z: route[i].z + d.t * (route[i + 1].z - route[i].z)
+            };
+            if(!pointInActiveZ(point)) continue;
+
+            if(d.dist < bestDist){
+                bestDist = d.dist;
+                bestIdx = d.t < 0.5 ? i : i + 1;
+            }
+        }
+    }
+
+    route.forEach((p, i)=>{
+        if(!pointInActiveZ(p)) return;
+        const sp = projectPoint(p);
+        const d = Math.hypot(sx - sp.x, sy - sp.y);
+        if(d < bestDist){
+            bestDist = d;
+            bestIdx = i;
+        }
+    });
+
+    return bestDist <= thresholdPx ? bestIdx : null;
+}
+
+function getRouteDeleteRange(){
+    if(ui.pendingDeleteRouteIdx === null || ui.hoverRouteIdx === null) return null;
+    const a = Math.min(ui.pendingDeleteRouteIdx, ui.hoverRouteIdx);
+    const b = Math.max(ui.pendingDeleteRouteIdx, ui.hoverRouteIdx);
+    return {start: a, end: b};
+}
+
+async function deleteRouteRange(startIdx, endIdx){
+    const route = getRoutePoints();
+    if(route.length < 2) throw new Error("当前没有可删除的路线");
+
+    let start = Math.max(0, Math.min(startIdx, route.length - 1));
+    let end = Math.max(0, Math.min(endIdx, route.length - 1));
+    if(start > end){
+        const t = start;
+        start = end;
+        end = t;
+    }
+
+    if(start === end){
+        if(end < route.length - 1) end += 1;
+        else if(start > 0) start -= 1;
+    }
+
+    const remaining = route
+        .slice(0, start)
+        .concat(route.slice(end + 1))
+        .map(p => ({
+            x: parseFloat(p.x.toFixed(4)),
+            y: parseFloat(p.y.toFixed(4)),
+            z: parseFloat(p.z.toFixed(4))
+        }));
+
+    if(remaining.length < 2){
+        alert("删除后路线点不足，若要删除整条路线请使用「清空路线和路点」。");
+        return;
+    }
+
+    const msg = `将删除第 ${start + 1} 到 ${end + 1} 个路线点，共 ${end - start + 1} 点。当前路线必须保持连续，删除后两侧会自动连接。`;
+    if(!confirm(msg)) return;
+
+    const d = await api("/api/route/set-points", "POST", {points: remaining});
+    if(!d.ok){
+        alert(d.message || "删除路线段失败");
+        return;
+    }
+
+    ui.pendingDeleteRouteIdx = null;
+    ui.hoverRouteIdx = null;
+    await refreshState(true);
+    setStatus(`已删除路线区间，剩余 ${remaining.length} 个点`);
+    updateModeHint();
+}
+
+function renderAxesHint(){
+    const origin = projectPoint({x:ui.view.centerX, y:ui.view.centerY, z:ui.view.centerZ});
+    drawCircle2D(origin, 3, "#ffffff");
+    drawText2D("中心", origin.x + 6, origin.y - 6, "#ffffff");
+}
+
+
+function renderPointCloud(points, color, pointSize) {
+    ctx.fillStyle = color;
+    
+    for (const point of points) {
+        // 投影到屏幕坐标
+        const screenPoint = projectPoint(point);
+        
+        // 绘制点
+        ctx.beginPath();
+        ctx.arc(screenPoint.x, screenPoint.y, pointSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+let _renderPending = false;
+let _renderLocked = false;
+function scheduleRender(){
+    if(_renderLocked) return;
+    if(_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(()=>{
+        _renderPending = false;
+        if(_renderLocked) return;
+        try{render();}catch(e){console.error("[render]",e);}
+    });
+}
+
+function render(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if(!ui.state) return;
+
+    var _cy=Math.cos(ui.view.yaw),_sy=Math.sin(ui.view.yaw);
+    var _cp=Math.cos(ui.view.pitch),_sp=Math.sin(ui.view.pitch);
+    var _m={r00:_cy,r01:-_sy,r02:0,r10:_cp*_sy,r11:_cp*_cy,r12:-_sp,r20:_sp*_sy,r21:_sp*_cy,r22:_cp};
+    var _hw=canvas.width/2+ui.view.offsetX,_hh=canvas.height/2+ui.view.offsetY,_sc=ui.view.scale;
+    var _cx=ui.view.centerX,_cyc=ui.view.centerY,_cz=ui.view.centerZ;
+    var _proj=function(p){
+        var x=p.x-_cx,y=p.y-_cyc,z=p.z-_cz;
+        var vx=_m.r00*x+_m.r01*y+_m.r02*z;
+        var vy=_m.r10*x+_m.r11*y+_m.r12*z;
+        var vz=_m.r20*x+_m.r21*y+_m.r22*z;
+        return {x:_hw+vx*_sc,y:_hh-vz*_sc,depth:vy};
+    }
+
+    var zMin=0,zMax=1;
+    if(ui.showPcd){
+        var pts=getAllMapPoints();
+        if(pts.length>0){
+            var zr=getMapZRange();zMin=zr.min;zMax=zr.max;
+            var lx=canvas.width-90,ly=40,lw=16,lh=160;
+            var lk=zMin.toFixed(3)+'|'+zMax.toFixed(3);
+            if(!ui._legendCache||ui._legendKey!==lk){
+                ui._legendKey=lk;
+                if(!ui._legendCache){ui._legendCache=document.createElement('canvas');ui._legendCache.width=lw;ui._legendCache.height=lh;}
+                var _lctx=ui._legendCache.getContext('2d');
+                for(var i=0;i<lh;i++){
+                    var t=1-i/lh, r,g,b;
+                    if(t<0.25){var s=t/0.25;r=0;g=Math.round(255*s);b=255;}
+                    else if(t<0.5){var s=(t-0.25)/0.25;r=0;g=255;b=Math.round(255*(1-s));}
+                    else if(t<0.75){var s=(t-0.5)/0.25;r=Math.round(255*s);g=255;b=0;}
+                    else{var s=(t-0.75)/0.25;r=255;g=Math.round(255*(1-s));b=0;}
+                    _lctx.fillStyle='rgb('+r+','+g+','+b+')';_lctx.fillRect(0,i,lw,1);
+                }
+            }
+            ctx.drawImage(ui._legendCache,lx,ly);
+            ctx.strokeStyle="#fff";ctx.lineWidth=1;ctx.strokeRect(lx,ly,lw,lh);
+            drawText2D(zMax.toFixed(2)+"m",lx-2,ly-5,"#fff");
+            drawText2D(zMin.toFixed(2)+"m",lx-2,ly+lh+12,"#fff");
+            drawText2D("高度",lx+1,ly-16,"#fff");
+            if(ui.useZFilter){
+                var topT=(ui.activeZMax-zMin)/(zMax-zMin||1);
+                var botT=(ui.activeZMin-zMin)/(zMax-zMin||1);
+                var yTop=ly+(1-Math.max(0,Math.min(1,topT)))*lh;
+                var yBot=ly+(1-Math.max(0,Math.min(1,botT)))*lh;
+                ctx.strokeStyle="#fbbf24";ctx.lineWidth=2;
+                ctx.strokeRect(lx-3,yTop,lw+6,Math.max(3,yBot-yTop));
+                drawText2D("当前层",lx-54,yTop+12,"#fbbf24");
+            }
+        }
+    }
+
+    renderAxesHint();
+
+    if(ui.showPcd){
+        var pts=getAllMapPoints();
+        if(pts.length>0){
+            var zRange=zMax-zMin||1;
+            var pk=zMin.toFixed(3)+'|'+zMax.toFixed(3);
+            if(!ui._palette||ui._paletteKey!==pk){
+                ui._paletteKey=pk;ui._palette=new Array(256);
+                for(var i=0;i<256;i++){
+                    var t=i/255,r,g,b;
+                    if(t<0.25){var s=t/0.25;r=0;g=Math.round(255*s);b=255;}
+                    else if(t<0.5){var s=(t-0.25)/0.25;r=0;g=255;b=Math.round(255*(1-s));}
+                    else if(t<0.75){var s=(t-0.5)/0.25;r=Math.round(255*s);g=255;b=0;}
+                    else{var s=(t-0.75)/0.25;r=255;g=Math.round(255*(1-s));b=0;}
+                    ui._palette[i]='rgba('+r+','+g+','+b+',0.82)';
+                }
+            }
+            var pal=ui._palette;
+            var useF=ui.useZFilter,azMin=ui.activeZMin,azMax=ui.activeZMax;
+            for(var i=0;i<pts.length;i++){
+                var p=pts[i];
+                if(useF){var pz=p.z;if(pz<azMin||pz>azMax)continue;}
+                var sp=_proj(p);
+                if(sp.x<-10||sp.x>canvas.width+10||sp.y<-10||sp.y>canvas.height+10)continue;
+                var ti=Math.floor(((p.z-zMin)/zRange)*255);
+                if(ti<0)ti=0;else if(ti>255)ti=255;
+                ctx.fillStyle=pal[ti];
+                ctx.fillRect(sp.x,sp.y,1.4,1.4);
+            }
+        }
+    }
+
+    if(ui.showDrivableAreas){
+        getDrivableAreas().forEach(function(area,i){
+            if(!areaIntersectsActiveZ(area))return;
+            var apts=getAreaDisplayPoints(area);
+            if(apts.length<3)return;
+            drawClosedProjected(apts,"rgba(20,184,166,0.16)","#14b8a6",2);
+            var p0=projectPoint(apts[0]);
+            drawText2D(i+":"+(area.name||"Area"),p0.x+6,p0.y-6,"#5eead4");
+        });
+    }
+
+    if(ui.state&&ui.state.obstacle_clusters&&ui.state.obstacle_clusters.length>0){
+        ui.state.obstacle_clusters.forEach(function(cl){
+            var cx=cl.center_x||0,cy=cl.center_y||0;
+            var r=Math.max(0.08,cl.radius||0.10);
+            var zmn=cl.z_min||0,zmx=cl.z_max||0;
+            var h=Math.max(0.25,zmx-zmn);
+            drawCylinderProjected({x:cx,y:cy,z:zmn},r,h,"rgba(239,68,68,0.45)","#ef4444");
+            var tp=projectPoint({x:cx,y:cy,z:zmn+h});
+            var d=ui.state.obstacle_distance||999;
+            if(d<99)drawText2D(d.toFixed(1)+"m",tp.x,tp.y-12,"#fca5a5");
+        });
+    }
+
+    if(ui.state&&ui.state.obstacle_boxes&&ui.state.obstacle_boxes.length>0){
+        ui.state.obstacle_boxes.forEach(function(box){
+            var pts=[{x:box.x_min,y:box.y_min},{x:box.x_max,y:box.y_min},{x:box.x_max,y:box.y_max},{x:box.x_min,y:box.y_max}];
+            drawClosedProjected(pts,"rgba(239,68,68,0.28)","#ef4444",2.5);
+            var cx=(box.x_min+box.x_max)/2,cy=(box.y_min+box.y_max)/2;
+            var cp=projectPoint({x:cx,y:cy,z:0});
+            drawText2D((box.x_max-box.x_min).toFixed(1)+"x"+(box.y_max-box.y_min).toFixed(1)+"m",cp.x,cp.y-8,"#f87171");
+        });
+    }
+
+    if(ui.drawingAreaPoints.length>0){
+        drawClosedProjected(ui.drawingAreaPoints,ui.drawingAreaPoints.length>=3?"rgba(251,191,36,0.14)":null,"#fbbf24",2);
+        ui.drawingAreaPoints.forEach(function(p,i){
+            var sp=projectPoint(p);
+            drawCircle2D(sp,5,"#fbbf24","#fff",1);
+            drawText2D(String(i+1),sp.x+6,sp.y-5,"#fbbf24");
+        });
+        if(ui.hoverWorld&&ui.mode==="draw_drivable_area"){
+            var last=ui.drawingAreaPoints[ui.drawingAreaPoints.length-1];
+            drawLine2D(projectPoint(last),projectPoint(ui.hoverWorld),"#fbbf24",1.5);
+        }
+    }
+
+    if(ui.drawingStairPoints.length>0){
+        drawFilteredPolylineProjected(ui.drawingStairPoints,"#fb923c",2.5);
+        ui.drawingStairPoints.forEach(function(p,i){
+            var sp=projectPoint(p);
+            drawCircle2D(sp,5,"#fb923c","#fff",1);
+            drawText2D(String(i+1),sp.x+6,sp.y-5,"#fdba74");
+        });
+        if(ui.hoverWorld&&ui.mode==="draw_stair_connector"){
+            var last=ui.drawingStairPoints[ui.drawingStairPoints.length-1];
+            drawLine2D(projectPoint(last),projectPoint(ui.hoverWorld),"#fb923c",1.5);
+        }
+    }
+
+    if(ui.pendingPlanGoal){
+        var goal=pointFromAny(ui.pendingPlanGoal);
+        drawCircle2D(projectPoint(goal),7,"#f59e0b","#fff",1.5);
+        if(ui.hoverWorld&&ui.mode==="plan_goal")drawArrowProjected(goal,ui.hoverWorld,"#f59e0b",2.5);
+    }
+
+    if(ui.pendingInitialPose){
+        var pos=pointFromAny(ui.pendingInitialPose);
+        drawCircle2D(projectPoint(pos),7,"#3b82f6","#fff",1.5);
+        if(ui.hoverWorld&&ui.mode==="set_initial_pose")drawArrowProjected(pos,ui.hoverWorld,"#3b82f6",2.5);
+    }
+
+    if(ui.showRoute){
+        var route=getRoutePoints(),remaining=getRemainingRoutePoints();
+        if(remaining.length>=2){
+            drawFilteredPolylineProjected(remaining,"#22c55e",2.4);
+            if(ui.mode==="delete_route_segment"){
+                if(ui.pendingDeleteRouteIdx!==null&&route[ui.pendingDeleteRouteIdx]){
+                    var p=projectPoint(route[ui.pendingDeleteRouteIdx]);
+                    drawCircle2D(p,7,"#fbbf24","#fff",1.5);
+                    drawText2D("删段起点",p.x+8,p.y-8,"#fbbf24");
+                }
+                var range=getRouteDeleteRange();
+                if(range){
+                    var rpts=route.slice(range.start,range.end+1);
+                    drawFilteredPolylineProjected(rpts,"#ef4444",4);
+                }
+                if(ui.hoverRouteIdx!==null&&route[ui.hoverRouteIdx]){
+                    var p=projectPoint(route[ui.hoverRouteIdx]);
+                    drawCircle2D(p,6,"#ef4444","#fff",1.5);
+                }
+            }
+        }
+    }
+
+    if((ui.mode==="draw_route"||ui.mode==="draw_curve")&&ui.drawingRoutePoints.length>=2){
+        if(ui.curveMode)drawCurveProjected(ui.drawingRoutePoints,"#f97316",2.5);
+        else drawPolylineProjected(ui.drawingRoutePoints,"#f97316",2.5);
+    }
+
+    if((ui.mode==="draw_route"||ui.mode==="draw_curve"||ui.mode==="edit_route_z")&&ui.drawingRoutePoints.length>0){
+        var mX=ui.drag.lastX||(canvas.width/2),mY=ui.drag.lastY||(canvas.height/2);
+        ui.drawingRoutePoints.forEach(function(p,i){
+            if(!pointInActiveZ(p))return;
+            var sp=projectPoint(p);
+            var isS=ui.mode==="edit_route_z"&&ui.pendingRouteZIdx===i;
+            var isH=ui.mode==="edit_route_z"&&findNearestDrawingRoutePointProjected(mX,mY,24)===i;
+            drawCircle2D(sp,isS?8:(isH?6:5),isS?"#fbbf24":(isH?"#fbbf24":"#f97316"),"#fff",1);
+            drawText2D((i+1)+"(z="+p.z.toFixed(2)+")",sp.x+7,sp.y-5,isS?"#fbbf24":(isH?"#fbbf24":"#f97316"));
+            if(isS)drawCircle2D(sp,12,"rgba(251,191,36,0.3)","#fbbf24",2);
+        });
+        if(ui.hoverWorld&&(ui.mode==="draw_route"||ui.mode==="draw_curve")){
+            var lastPt=ui.drawingRoutePoints[ui.drawingRoutePoints.length-1];
+            var hp=projectPoint(ui.hoverWorld),lp=projectPoint(lastPt);
+            ctx.setLineDash([5,5]);ctx.strokeStyle="#f97316";ctx.lineWidth=1.5;
+            ctx.beginPath();ctx.moveTo(lp.x,lp.y);ctx.lineTo(hp.x,hp.y);ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+
+    if(ui.state.nav&&ui.state.nav.lookahead_target){
+        var p=projectPoint(pointFromAny(ui.state.nav.lookahead_target));
+        drawCircle2D(p,6,"#f59e0b");
+    }
+
+    if(ui.showRobot&&ui.state.current_pose){
+        ui._render_seq=(ui._render_seq||0)+1;
+        if(ui._render_seq%50===1){
+            var cp=ui.state.current_pose;
+            console.log("[RENDER #"+ui._render_seq+"] robot at:","x="+cp.x?.toFixed(2)+" y="+cp.y?.toFixed(2)+" z="+cp.z?.toFixed(2)+" yaw_deg="+cp.yaw_deg?.toFixed(1));
+        }
+        var pose=pointFromAny(ui.state.current_pose);
+        drawCylinderProjected({x:pose.x,y:pose.y,z:pose.z},0.11,0.22,"#2492ff","#ffffff");
+        var yaw=Number(ui.state.current_pose.yaw_deg||0)*Math.PI/180;
+        var aS={x:pose.x,y:pose.y,z:pose.z+0.14};
+        var aE={x:aS.x+0.45*Math.cos(yaw),y:aS.y+0.45*Math.sin(yaw),z:aS.z};
+        drawArrowProjected(aS,aE,"#ffff00",3);
+    }
+}
+
+function collectAllPointsForFit(){
+    const pts = [];
+
+    const mapPts = getAllMapPoints();
+    if(mapPts.length > 0){
+        const step = Math.max(1, Math.floor(mapPts.length / 4000));
+        for(let i=0;i<mapPts.length;i+=step){
+            if(pointInActiveZ(mapPts[i])) pts.push(mapPts[i]);
+        }
+    }
+
+    getRoutePoints().forEach(p=>{ if(pointInActiveZ(p)) pts.push(p); });
+
+    if(ui.state && ui.state.current_pose){
+        const p = pointFromAny(ui.state.current_pose);
+        if(pointInActiveZ(p)) pts.push(p);
+    }
+    if(ui.state && ui.state.nav && ui.state.nav.lookahead_target){
+        const p = pointFromAny(ui.state.nav.lookahead_target);
+        if(pointInActiveZ(p)) pts.push(p);
+    }
+    ui.drawingRoutePoints.forEach(p => { if(pointInActiveZ(p)) pts.push(p); });
+    ui.drawingAreaPoints.forEach(p => { if(pointInActiveZ(p)) pts.push(p); });
+    ui.drawingStairPoints.forEach(p => { if(pointInActiveZ(p)) pts.push(p); });
+    getDrivableAreas().forEach(area=>{
+        if(!areaIntersectsActiveZ(area)) return;
+        getAreaDisplayPoints(area).forEach(p=>pts.push(p));
+    });
+    getConnectors().forEach(conn=>{
+        getConnectorPoints(conn).forEach(p=>{
+            if(pointInActiveZ(p)) pts.push(p);
+        });
+    });
+
+    if(ui.state && ui.state.obstacle_clusters){
+        ui.state.obstacle_clusters.forEach(cl => {
+            const p = {x: cl.center_x || 0, y: cl.center_y || 0, z: cl.z_min || 0};
+            if(pointInActiveZ(p)) pts.push(p);
+            const p2 = {x: cl.center_x || 0, y: cl.center_y || 0, z: (cl.z_max || cl.z_min || 0)};
+            if(pointInActiveZ(p2)) pts.push(p2);
+        });
+    }
+
+    return pts;
+}
+
+function fitView(){
+    const pts = collectAllPointsForFit();
+    if(pts.length === 0){
+        resetView();
+        return;
+    }
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    pts.forEach(p=>{
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        minZ = Math.min(minZ, p.z);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+        maxZ = Math.max(maxZ, p.z);
+    });
+
+    ui.view.centerX = (minX + maxX) * 0.5;
+    ui.view.centerY = (minY + maxY) * 0.5;
+    ui.view.centerZ = (minZ + maxZ) * 0.5;
+    ui.view.offsetX = 0;
+    ui.view.offsetY = 0;
+
+    let xs = [], ys = [];
+    pts.forEach(p=>{
+        const sp = projectPoint(p);
+        xs.push(sp.x);
+        ys.push(sp.y);
+    });
+
+    let minSX = Math.min(...xs), maxSX = Math.max(...xs);
+    let minSY = Math.min(...ys), maxSY = Math.max(...ys);
+    let w = Math.max(1e-6, maxSX - minSX);
+    let h = Math.max(1e-6, maxSY - minSY);
+
+    const pad = 50;
+    const sx = (canvas.width - pad * 2) / w;
+    const sy = (canvas.height - pad * 2) / h;
+    ui.view.scale = ui.view.scale * Math.min(sx, sy);
+
+    // 再微调一次
+    xs = []; ys = [];
+    pts.forEach(p=>{
+        const sp = projectPoint(p);
+        xs.push(sp.x);
+        ys.push(sp.y);
+    });
+    minSX = Math.min(...xs); maxSX = Math.max(...xs);
+    minSY = Math.min(...ys); maxSY = Math.max(...ys);
+
+    const centerScreenX = (minSX + maxSX) * 0.5;
+    const centerScreenY = (minSY + maxSY) * 0.5;
+
+    ui.view.offsetX += canvas.width * 0.5 - centerScreenX;
+    ui.view.offsetY += canvas.height * 0.5 - centerScreenY;
+
+    scheduleRender();
+}
+
+function resetView(){
+    ui.view.scale = 40;
+    ui.view.yaw = -0.85;
+    ui.view.pitch = 0.55;
+    ui.view.offsetX = 0;
+    ui.view.offsetY = 0;
+    ui.view.centerX = 0;
+    ui.view.centerY = 0;
+    ui.view.centerZ = 0;
+    scheduleRender();
+}
+
+function togglePcdVisible(){ ui.showPcd = !ui.showPcd; scheduleRender(); }
+function toggleRouteVisible(){ ui.showRoute = !ui.showRoute; scheduleRender(); }
+function toggleRobotVisible(){ ui.showRobot = !ui.showRobot; scheduleRender(); }
+
+function syncInputs(force=false){
+    if(!ui.state) return;
+    if(!force && ui.isEditingParam) return;
+
+    const cp = ui.state.control_params || {};
+    const sp = ui.state.smoothing_params || {};
+
+    const setv = (id, v)=>{
+        const el = document.getElementById(id);
+        if(el && v !== undefined && v !== null) el.value = String(v);
+    };
+
+    setv("max_vx", cp.max_linear_x);
+    setv("max_wz", cp.max_angular_z);
+    setv("min_vx", cp.min_linear_x);
+    setv("min_wz", cp.min_angular_z);
+    setv("arrival_dist", cp.arrival_distance);
+    setv("arrival_angle", cp.arrival_angle_deg);
+    setv("alpha", cp.alpha);
+    setv("obstacle_threshold", cp.obstacle_threshold);
+    setv("resume_delay", cp.resume_delay);
+    setv("deceleration_alpha", cp.deceleration_alpha);
+    setv("lookahead_distance", cp.lookahead_distance);
+    setv("path_yaw_kp", cp.path_yaw_kp);
+    setv("final_yaw_kp", cp.final_yaw_kp);
+    setv("end_slowdown_distance", cp.end_slowdown_distance);
+    setv("heading_slow_angle_deg", cp.heading_slow_angle_deg);
+
+    setv("route_sample_gap", sp.route_sample_gap);
+}
+
+async function refreshState(fit=false){
+    if(ui.fullRefreshBusy) return;
+    ui.fullRefreshBusy = true;
+    try{
+        const oldMapRev = ui.revisions.map;
+        ui.state = await api("/api/state");
+        ui.revisions = getRevisions(ui.state);
+        // 地图数据变化时清除 Z 范围缓存
+        if(ui.revisions.map !== oldMapRev){
+            ui.cachedZRange = {min: 0, max: 1, valid: false};
+            ui.zFilterInitialized = false;
+            ui._pointsNormalized = null; ui._pointsRevision = 0;
+        }
+        _normalizeMapPoints();
+        initializeZFilterFromMap(false);
+        syncInputs(true);
+        syncZFilterInputs();
+        updateInfo();
+        updateDrivableAreaInfo();
+        if(fit) fitView();
+        scheduleRender();
+    }finally{
+        ui.fullRefreshBusy = false;
+    }
+}
+
+function updateInfo(){
+    if(!ui.state)return;
+    var ic=ui._infoCache;
+    setBackendStatus(ui.state.status_text||"等待操作");
+    if(ui.state.current_pose){
+        var pt='当前位置: X='+ui.state.current_pose.x.toFixed(2)+' Y='+ui.state.current_pose.y.toFixed(2)+' Z='+(ui.state.current_pose.z||0).toFixed(2)+' Yaw='+ui.state.current_pose.yaw_deg.toFixed(1)+'°';
+        if(ic._pose!==pt){ic._pose=pt;document.getElementById("poseText").innerText=pt;}
+    }else{if(ic._pose!=='-'){ic._pose='-';document.getElementById("poseText").innerText="当前位置: X=--- Y=--- Z=--- Yaw=---";}}
+    var vt='当前速度: vx='+(ui.state.current_vx||0).toFixed(2)+' wz='+(ui.state.current_wz||0).toFixed(2);
+    if(ic._vel!==vt){ic._vel=vt;document.getElementById("velText").innerText=vt;}
+    var od=ui.state.obstacle_distance||999;
+    var ot=(od>=999)?"前方障碍距离: --- m":'前方障碍距离: '+od.toFixed(2)+' m ('+(ui.state.obstacle_clusters||[]).length+'个障碍物)';
+    if(ic._obs!==ot){ic._obs=ot;document.getElementById("obsText").innerText=ot;}
+    var nt="导航阶段: "+((ui.state.nav&&ui.state.nav.stage)||"-");
+    if(ic._nav!==nt){ic._nav=nt;document.getElementById("navText").innerText=nt;}
+    if(ui.state.nav&&ui.state.nav.lookahead_target){
+        var p=ui.state.nav.lookahead_target;
+        var lt='前视目标: ('+p.x.toFixed(2)+', '+p.y.toFixed(2)+', '+(p.z||0).toFixed(2)+')';
+        if(ic._look!==lt){ic._look=lt;document.getElementById("lookaheadText").innerText=lt;}
+    }else{if(ic._look!=='-'){ic._look='-';document.getElementById("lookaheadText").innerText="前视目标: -";}}
+    var ct="图像话题: "+((ui.state.camera&&ui.state.camera.topic)||"-");
+    if(ic._cam!==ct){ic._cam=ct;document.getElementById("cameraTopicText").innerText=ct;}
+    var lines=[];
+    lines.push("地图: "+(ui.state.pcd_path||"未加载"));
+    if(ui.useZFilter)lines.push('当前高度层: '+ui.activeZMin.toFixed(2)+' ~ '+ui.activeZMax.toFixed(2)+' m');
+    else lines.push("当前高度层: 全部高度");
+    var topics=ui.state.topics||{};
+    lines.push("开启导航话题: "+(topics.nav_start_topic||"-"));
+    lines.push("停止导航话题: "+(topics.nav_stop_topic||"-"));
+    lines.push("导航完成话题: "+(topics.nav_done_topic||"-"));
+    lines.push("外部目标点话题: "+(topics.external_goal_topic||"-"));
+    lines.push("路线点数: "+((ui.state.route_polyline||[]).length));
+    lines.push("可行驶区域数: "+((ui.state.drivable_areas||[]).length));
+    lines.push("中心线点数: "+ui.drawingStairPoints.length);
+    var ri=lines.join("\n");
+    if(ic._routeInfo!==ri){ic._routeInfo=ri;document.getElementById("routeInfo").textContent=ri;}
+}
+
+async function uploadPcd(file){
+    const form = new FormData();
+    form.append("file", file);
+    const d = await api("/api/map/upload-pcd", "POST", form, true);
+    if(!d.ok){
+        alert(d.message || "上传失败");
+        return;
+    }
+    await refreshState(true);
+}
+
+async function saveMapWorkspace(){
+    const res = await fetch("/api/map/save-workspace", {method:"POST"});
+    if(!res.ok){
+        alert("保存地图工程失败: HTTP " + res.status);
+        return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "indoor_map_workspace.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function loadMapWorkspace(file){
+    const form = new FormData();
+    form.append("file", file);
+    const d = await api("/api/map/load-workspace", "POST", form, true);
+    if(!d.ok){
+        alert(d.message || "读取地图工程失败");
+        return;
+    }
+    ui.drawingAreaPoints = [];
+    ui.drawingAreaPlaneZ = null;
+    ui.hoverWorld = null;
+    await refreshState(true);
+}
+
+async function uploadRouteJson(file){
+    const form = new FormData();
+    form.append("file", file);
+    const d = await api("/api/route/upload-json", "POST", form, true);
+    if(!d.ok){
+        alert(d.message || "JSON 路线读取失败");
+        return;
+    }
+    await refreshState(true);
+}
+
+async function saveRoute(){
+    const route = getRoutePoints();
+    if(route.length < 2){
+        alert("路线点不足，无法保存");
+        return;
+    }
+
+    const defaultPath = "route.json";
+    const filePath = prompt("请输入要保存的完整路径和文件名", defaultPath);
+    if(filePath === null || filePath.trim() === "") return;
+
+    const d = await api("/api/route/save-to-path", "POST", {
+        file_path: filePath.trim()
+    });
+
+    if(!d.ok){
+        alert(d.message || "保存失败");
+        return;
+    }
+    alert(d.message || "保存成功");
+}
+
+async function uploadRouteNpz(file){
+    const form = new FormData();
+    form.append("file", file);
+    const d = await api("/api/route/upload-npz", "POST", form, true);
+    if(!d.ok){
+        alert(d.message || "NPZ 路线读取失败");
+        return;
+    }
+    await refreshState(true);
+}
+
+async function saveParamsConfig(){
+    const defaultPath = "system_params.yaml";
+    const filePath = prompt("请输入要保存的完整路径和文件名", defaultPath);
+    if(filePath === null || filePath.trim() === "") return;
+
+    const d = await api("/api/config/save-system-params-to-path", "POST", {
+        file_path: filePath.trim()
+    });
+
+    if(!d.ok){
+        alert(d.message || "保存失败");
+        return;
+    }
+    alert(d.message || "保存成功");
+}
+
+async function loadParamsConfigFile(file){
+    const form = new FormData();
+    form.append("file", file);
+    const d = await api("/api/config/load-system-params", "POST", form, true);
+    if(!d.ok){
+        alert(d.message || "读取失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+function getControlParams(){
+    return {
+        max_linear_x: parseFloat(document.getElementById("max_vx").value),
+        max_angular_z: parseFloat(document.getElementById("max_wz").value),
+        min_linear_x: parseFloat(document.getElementById("min_vx").value),
+        min_angular_z: parseFloat(document.getElementById("min_wz").value),
+        arrival_distance: parseFloat(document.getElementById("arrival_dist").value),
+        arrival_angle_deg: parseFloat(document.getElementById("arrival_angle").value),
+        alpha: parseFloat(document.getElementById("alpha").value),
+        obstacle_threshold: parseFloat(document.getElementById("obstacle_threshold").value),
+        resume_delay: parseFloat(document.getElementById("resume_delay").value),
+        deceleration_alpha: parseFloat(document.getElementById("deceleration_alpha").value),
+        lookahead_distance: parseFloat(document.getElementById("lookahead_distance").value),
+        path_yaw_kp: parseFloat(document.getElementById("path_yaw_kp").value),
+        final_yaw_kp: parseFloat(document.getElementById("final_yaw_kp").value),
+        end_slowdown_distance: parseFloat(document.getElementById("end_slowdown_distance").value),
+        heading_slow_angle_deg: parseFloat(document.getElementById("heading_slow_angle_deg").value)
+    };
+}
+
+function getSmoothParams(){
+    return {
+        route_sample_gap: parseFloat(document.getElementById("route_sample_gap").value)
+    };
+}
+
+async function applyControlParams(){
+    const d = await api("/api/params/control", "POST", getControlParams());
+    if(!d.ok){
+        alert(d.message || "应用失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+async function applySmoothingParams(){
+    const d = await api("/api/params/smoothing", "POST", getSmoothParams());
+    if(!d.ok){
+        alert(d.message || "应用失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+async function startNavigation(){
+    const d = await api("/api/nav/start", "POST");
+    if(!d.ok){
+        alert(d.message || "启动失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+async function stopNavigation(){
+    const d = await api("/api/nav/stop", "POST");
+    if(!d.ok){
+        alert(d.message || "停止失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+async function emergencyStop(){
+    const d = await api("/api/nav/emergency", "POST");
+    if(!d.ok){
+        alert(d.message || "急停失败");
+        return;
+    }
+    await refreshState(false);
+}
+
+function openRosImage(){
+    document.getElementById("cameraImg").src = "/api/camera/mjpeg?t=" + Date.now();
+}
+
+function closeRosImage(){
+    document.getElementById("cameraImg").src = "";
+}
+
+// ========== 底盘控制 ==========
+let chassis = {
+    stairOn: false,
+    imuOn: false,
+    linearSpeed: 0.40,
+    turnSpeed: 0.50,
+    activeDir: null
+};
+
+function chassisSpeedChanged(){
+    const v = parseFloat(document.getElementById("chassisSpeedSlider").value);
+    chassis.linearSpeed = v;
+    document.getElementById("chassisSpeedLabel").innerText = v.toFixed(2);
+}
+
+function chassisTurnSpeedChanged(){
+    const v = parseFloat(document.getElementById("chassisTurnSpeedSlider").value);
+    chassis.turnSpeed = v;
+    document.getElementById("chassisTurnSpeedLabel").innerText = v.toFixed(2);
+}
+
+async function chassisSetMode(mode){
+    try {
+        const d = await api("/api/chassis/mode", "POST", {mode: mode, enable: true});
+        setStatus(d.message || `chassis mode: ${mode}`);
+    } catch(e) {
+        setStatus("底盘模式切换失败: " + e.message);
+    }
+}
+
+async function chassisToggleStair(){
+    chassis.stairOn = !chassis.stairOn;
+    const btn = document.getElementById("btnStairToggle");
+    try {
+        const d = await api("/api/chassis/mode", "POST", {mode: "stair", enable: chassis.stairOn});
+        btn.innerText = "楼梯: " + (chassis.stairOn ? "开" : "关");
+        btn.className = "btn " + (chassis.stairOn ? "green" : "orange");
+        setStatus(d.message || `stair enable=${chassis.stairOn}`);
+    } catch(e) {
+        chassis.stairOn = !chassis.stairOn;
+        setStatus("楼梯切换失败: " + e.message);
+    }
+}
+
+async function chassisSitdown(){
+    try {
+        const d = await api("/api/chassis/sitdown", "POST");
+        setStatus(d.message || "sitdown sent");
+    } catch(e) {
+        setStatus("sitdown失败: " + e.message);
+    }
+}
+
+async function chassisEmgyStop(){
+    try {
+        const d = await api("/api/chassis/emgy_stop", "POST");
+        setStatus(d.message || "emgy_stop sent");
+    } catch(e) {
+        setStatus("紧急停止失败: " + e.message);
+    }
+}
+
+async function chassisToggleImu(){
+    chassis.imuOn = !chassis.imuOn;
+    const btn = document.getElementById("btnImuToggle");
+    try {
+        const d = await api("/api/chassis/imu_enable", "POST", {enable: chassis.imuOn});
+        btn.innerText = "IMU: " + (chassis.imuOn ? "开" : "关");
+        btn.className = "btn " + (chassis.imuOn ? "green" : "blue");
+        setStatus(d.message || `IMU enable=${chassis.imuOn}`);
+    } catch(e) {
+        chassis.imuOn = !chassis.imuOn;
+        setStatus("IMU切换失败: " + e.message);
+    }
+}
+
+function startDirMove(btn){
+    const signVx = parseInt(btn.dataset.vx || "0");
+    const signVy = parseInt(btn.dataset.vy || "0");
+    const signVz = parseInt(btn.dataset.vz || "0");
+
+    const vx = signVx * chassis.linearSpeed;
+    const vy = signVy * chassis.linearSpeed;
+    const vz = signVz * chassis.turnSpeed;
+
+    chassis.activeDir = btn;
+    btn.classList.add("active");
+    api("/api/chassis/cmd_vel", "POST", {vx, vy, vz}).then(d=>{
+        if(d && d.ok && chassis.activeDir === btn){
+            setStatus(d.message || `cmd_vel: vx=${vx.toFixed(2)} vy=${vy.toFixed(2)} wz=${vz.toFixed(2)}`);
+        }
+    }).catch(e=>{
+        setStatus("cmd_vel error: " + e.message);
+    });
+}
+
+function stopDirMove(){
+    if(chassis.activeDir){
+        chassis.activeDir.classList.remove("active");
+        chassis.activeDir = null;
+    }
+    api("/api/chassis/cmd_vel", "POST", {vx:0, vy:0, vz:0}).catch(()=>{});
+}
+
+function chassisStop(){
+    stopDirMove();
+}
+
+document.addEventListener("mouseup", (e)=>{
+    if(chassis.activeDir && !e.target.closest(".dir-btn")){
+        stopDirMove();
+    }
+});
+
+async function shutdownProgram(){
+    if(!confirm("确定关闭程序吗？")) return;
+    try{
+        await fetch("/api/system/shutdown", {method:"POST"});
+        alert("程序即将关闭");
+    }catch(e){}
+}
+
+function connectWS(){
+    try{
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+    ui.ws = new WebSocket(`${protocol}://${location.host}/ws/status`);
+    ui._ws_msg_seq = 0;
+    ui._ws_open = true;
+
+    ui.ws.onopen = ()=>{
+        console.log("[WS] connected");
+        ui._ws_open = true;
+    };
+    ui.ws.onclose = ()=>{
+        console.log("[WS] closed, will reconnect in 2s");
+        ui._ws_open = false;
+        setTimeout(connectWS, 2000);
+    };
+    ui.ws.onerror = (e)=>{
+        console.log("[WS] error", e);
+    };
+
+    ui.ws.onmessage = async (ev)=>{
+        try{
+            const d = JSON.parse(ev.data);
+            if(d.type === "compact_state"){
+                ui._ws_msg_seq = (ui._ws_msg_seq || 0) + 1;
+                if(ui._ws_msg_seq % 50 === 1){
+                    const cp = d.current_pose;
+                    console.log("[WS #"+ui._ws_msg_seq+"] current_pose:", cp ? `x=${cp.x?.toFixed(2)} y=${cp.y?.toFixed(2)} z=${cp.z?.toFixed(2)} yaw_deg=${cp.yaw_deg?.toFixed(1)}` : "NULL");
+                }
+
+                const oldRev = {...ui.revisions};
+
+                if(!ui.state) ui.state = {};
+                ui.state.status_text = d.status_text;
+                ui.state.localized = d.localized;
+                ui.state.current_pose = d.current_pose;
+                ui.state.current_vx = d.current_vx;
+                ui.state.current_wz = d.current_wz;
+                ui.state.obstacle_distance = d.obstacle_distance;
+                ui.state.obstacle_boxes = d.obstacle_boxes || [];
+                ui.state.obstacle_clusters = d.obstacle_clusters || [];
+                if(ui._ws_msg_seq && ui._ws_msg_seq % 50 === 1){
+                    console.log("[WS #"+ui._ws_msg_seq+"] obs_dist="+ui.state.obstacle_distance+" clusters="+ui.state.obstacle_clusters.length+" boxes="+ui.state.obstacle_boxes.length);
+                }
+                ui.state.nav = d.nav || {};
+                ui.state.camera = d.camera || {};
+                ui.state.pcd_path = d.pcd_path || "";
+                ui.state.topics = d.topics || {};
+                ui.state.route_polyline = d.route_polyline || [];
+                ui.state.route_count = d.route_count;
+                ui.state.revisions = d.revisions || {map:0, route:0, area:0};
+
+                try {
+                    updateInfo();
+                } catch(e2) { console.error("[WS] updateInfo error:", e2); }
+                try {
+                    scheduleRender();
+                } catch(e2) { console.error("[WS] render error:", e2); }
+
+                const newRev = getRevisions(d);
+                const changed =
+                    newRev.map !== oldRev.map ||
+                    newRev.route !== oldRev.route ||
+                    newRev.area !== oldRev.area;
+
+                ui.revisions = newRev;
+
+                const mapOrAreaChanged = newRev.map !== oldRev.map || newRev.area !== oldRev.area;
+                if(changed && mapOrAreaChanged && !ui.fullRefreshBusy){
+                    await refreshState(false);
+                }
+            }else{
+                ui.state = d;
+                ui.revisions = getRevisions(d);
+                try {
+                    syncInputs(false);
+                    updateInfo();
+                    scheduleRender();
+                } catch(e2) { console.error("[WS] render error:", e2); }
+            }
+        }catch(e){ console.error("[WS] message error:", e); }
+    };
+
+    ui.ws.onclose = ()=>setTimeout(connectWS, 3000);
+    }catch(e){console.error("[WS] connect error:",e);}
+}
+
+function resizeCanvas(){
+    const rect = wrap.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    scheduleRender();
+}
+
+canvas.addEventListener("contextmenu", e=>e.preventDefault());
+
+canvas.addEventListener("mousedown", (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    ui.drag.lastX = sx;
+    ui.drag.lastY = sy;
+    ui.drag.moved = false;
+
+    if(e.button === 2){ // 右键用于旋转视图
+        ui.drag.rotating = true;
+        return;
+    }
+
+    if(e.button === 1){ // 中键用于平移视图
+        ui.drag.panning = true;
+        return;
+    }
+
+    if(e.button === 0 && ui.mode === "none"){ // 左键仅在空闲模式旋转
+        ui.drag.rotating = true;
+    }
+});
+
+canvas.addEventListener("mousemove", (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    const dx = sx - ui.drag.lastX;
+    const dy = sy - ui.drag.lastY;
+
+    if(ui.drag.panning){
+        if(Math.abs(dx) > 0 || Math.abs(dy) > 0) ui.drag.moved = true;
+        ui.view.offsetX += dx;
+        ui.view.offsetY += dy;
+        ui.drag.lastX = sx;
+        ui.drag.lastY = sy;
+        scheduleRender();
+        return;
+    }
+
+    if(ui.drag.rotating){
+        if(Math.abs(dx) > 0 || Math.abs(dy) > 0) ui.drag.moved = true;
+        ui.view.yaw += dx * 0.008;
+        ui.view.pitch += dy * 0.006;
+        ui.view.pitch = Math.max(-1.45, Math.min(1.45, ui.view.pitch));
+        ui.drag.lastX = sx;
+        ui.drag.lastY = sy;
+        scheduleRender();
+        return;
+    }
+
+    // 预览鼠标点
+    if(ui.mode === "draw_route" && ui.drawingRoutePoints.length > 0){
+        ui.hoverWorld = getDrawRouteHoverPoint(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "draw_drivable_area" && ui.drawingAreaPoints.length > 0){
+        ui.hoverWorld = getDrivableAreaPointFromCanvas(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "delete_drivable_area"){
+        ui.hoverWorld = getPlanningPointFromCanvas(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "draw_stair_connector" && ui.drawingStairPoints.length > 0){
+        ui.hoverWorld = getPlanningPointFromCanvas(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "plan_goal"){
+        ui.hoverWorld = getPlanningPointFromCanvas(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "set_initial_pose" && ui.pendingInitialPose){
+        ui.hoverWorld = getPlanningPointFromCanvas(sx, sy);
+        scheduleRender();
+    }else if(ui.mode === "edit_route_z"){
+        // 检查鼠标是否悬停在某个点上
+        const hoverIdx = findNearestDrawingRoutePointProjected(sx, sy, 24);
+        const prevHoverIdx = findNearestDrawingRoutePointProjected(ui.drag.lastX, ui.drag.lastY, 24);
+        if(hoverIdx !== prevHoverIdx){
+            // 悬停状态改变，重新渲染
+            scheduleRender();
+        }
+    }else if(ui.mode === "delete_route_segment"){
+        const idx = findNearestRouteIndexProjected(sx, sy, 18);
+        if(idx !== ui.hoverRouteIdx){
+            ui.hoverRouteIdx = idx;
+            scheduleRender();
+        }
+    }
+});
+
+window.addEventListener("mouseup", ()=>{
+    ui.drag.panning = false;
+    ui.drag.rotating = false;
+});
+
+// 键盘事件监听：左右箭头旋转视图，上下左右箭头修改点位坐标
+window.addEventListener("keydown", (e)=>{
+    if(ui.isEditingParam) return; // 如果在参数输入框中，不处理快捷键
+
+    const step = 0.05; // 坐标调整步长（单位：米）
+    const rotateStep = 0.1; // 旋转步长
+
+    switch(e.key){
+        case "ArrowLeft":
+            e.preventDefault();
+            if(ui.mode === "edit_route_z" && ui.pendingRouteZIdx !== null){
+                // 编辑模式下：左键减少 X 坐标
+                const p = ui.drawingRoutePoints[ui.pendingRouteZIdx];
+                p.x -= step;
+                updateRouteEditPanel();
+                scheduleRender();
+            }else{
+                // 其他模式：旋转视图
+                ui.view.yaw -= rotateStep;
+                scheduleRender();
+            }
+            break;
+
+        case "ArrowRight":
+            e.preventDefault();
+            if(ui.mode === "edit_route_z" && ui.pendingRouteZIdx !== null){
+                // 编辑模式下：右键增加 X 坐标
+                const p = ui.drawingRoutePoints[ui.pendingRouteZIdx];
+                p.x += step;
+                updateRouteEditPanel();
+                scheduleRender();
+            }else{
+                // 其他模式：旋转视图
+                ui.view.yaw += rotateStep;
+                scheduleRender();
+            }
+            break;
+
+        case "ArrowUp":
+            e.preventDefault();
+            if(ui.mode === "edit_route_z" && ui.pendingRouteZIdx !== null){
+                // 编辑模式下：上键增加 Y 坐标
+                const p = ui.drawingRoutePoints[ui.pendingRouteZIdx];
+                p.y += step;
+                updateRouteEditPanel();
+                scheduleRender();
+            }
+            break;
+
+        case "ArrowDown":
+            e.preventDefault();
+            if(ui.mode === "edit_route_z" && ui.pendingRouteZIdx !== null){
+                // 编辑模式下：下键减少 Y 坐标
+                const p = ui.drawingRoutePoints[ui.pendingRouteZIdx];
+                p.y -= step;
+                updateRouteEditPanel();
+                scheduleRender();
+            }
+            break;
+    }
+});
+
+canvas.addEventListener("wheel", (e)=>{
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    ui.view.scale *= factor;
+    ui.view.scale = Math.max(2.0, Math.min(1000, ui.view.scale));
+    scheduleRender();
+}, {passive:false});
+
+canvas.addEventListener("click", async (e)=>{
+    if(!ui.state) return;
+    if(ui.drag.moved) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    if(ui.mode === "delete_route_segment"){
+        const idx = findNearestRouteIndexProjected(sx, sy, 18);
+        if(idx === null){
+            alert("未找到附近路线，请点击绿色路线");
+            return;
+        }
+
+        if(ui.pendingDeleteRouteIdx === null){
+            ui.pendingDeleteRouteIdx = idx;
+            ui.hoverRouteIdx = idx;
+            setStatus(`已选择删除区间起点：第 ${idx + 1} 个路线点，请点击终点`);
+            updateModeHint();
+            scheduleRender();
+        }else{
+            await deleteRouteRange(ui.pendingDeleteRouteIdx, idx);
+        }
+        return;
+    }
+
+    if(ui.mode === "draw_drivable_area"){
+        const p = getDrivableAreaPointFromCanvas(sx, sy);
+        if(!p){
+            alert("无法获取区域点坐标");
+            return;
+        }
+        ui.drawingAreaPoints.push({x:p.x, y:p.y, z:p.z});
+        updateDrivableAreaInfo();
+        updateModeHint();
+        setStatus(`已添加区域边界点，当前 ${ui.drawingAreaPoints.length} 个点`);
+        scheduleRender();
+        return;
+    }
+
+    if(ui.mode === "delete_drivable_area"){
+        const idx = findDrivableAreaIndexAtCanvasPoint(sx, sy);
+        if(idx === null){
+            alert("未点中可行驶区域");
+            return;
+        }
+        await deleteDrivableAreaByIndex(idx);
+        return;
+    }
+
+    if(ui.mode === "draw_stair_connector"){
+        const p = getPlanningPointFromCanvas(sx, sy);
+        if(!p){
+            alert("无法获取中心线点坐标");
+            return;
+        }
+        ui.drawingStairPoints.push({x:p.x, y:p.y, z:p.z});
+        updateConnectorInfo();
+        updateModeHint();
+        setStatus(`已添加中心线点，当前 ${ui.drawingStairPoints.length} 个点`);
+        scheduleRender();
+        return;
+    }
+
+    if(ui.mode === "plan_goal"){
+        const goal = getPlanningPointFromCanvas(sx, sy);
+        if(!goal){
+            alert("无法获取目标点坐标");
+            return;
+        }
+        if(ui.pendingPlanGoal === null){
+            ui.pendingPlanGoal = {x: goal.x, y: goal.y, z: goal.z};
+            ui.hoverWorld = goal;
+            setStatus("已选中目标位置，请第二次点击设置终点朝向");
+            updateModeHint();
+            scheduleRender();
+            return;
+        }
+
+        const yawDist = Math.hypot(
+            goal.y - ui.pendingPlanGoal.y,
+            goal.x - ui.pendingPlanGoal.x
+        );
+        if(yawDist < 0.05){
+            alert("朝向点离终点太近，请在终点前方稍远处再点一次");
+            return;
+        }
+
+        const yaw = Math.atan2(
+            goal.y - ui.pendingPlanGoal.y,
+            goal.x - ui.pendingPlanGoal.x
+        ) * 180 / Math.PI;
+        const ok = await planToGoalPoint(ui.pendingPlanGoal, yaw);
+        if(!ok){
+            updateModeHint();
+            scheduleRender();
+        }
+        return;
+    }
+
+    if(ui.mode === "set_initial_pose"){
+        const pt = getPlanningPointFromCanvas(sx, sy);
+        if(!pt){
+            alert("无法获取坐标");
+            return;
+        }
+        if(ui.pendingInitialPose === null){
+            ui.pendingInitialPose = {x: pt.x, y: pt.y, z: pt.z};
+            ui.hoverWorld = pt;
+            setStatus("已选中位置，请第二次点击设置朝向（发布/initialpose）");
+            updateModeHint();
+            scheduleRender();
+            return;
+        }
+
+        const yawDist = Math.hypot(
+            pt.y - ui.pendingInitialPose.y,
+            pt.x - ui.pendingInitialPose.x
+        );
+        if(yawDist < 0.05){
+            alert("朝向点离位置太近，请在位置前方稍远处再点一次");
+            return;
+        }
+
+        const yaw = Math.atan2(
+            pt.y - ui.pendingInitialPose.y,
+            pt.x - ui.pendingInitialPose.x
+        ) * 180 / Math.PI;
+
+        await publishInitialPose(
+            ui.pendingInitialPose.x,
+            ui.pendingInitialPose.y,
+            ui.pendingInitialPose.z,
+            yaw
+        );
+        return;
+    }
+
+    if(ui.mode === "draw_route" || ui.mode === "draw_curve"){
+        const picked = pickNearestPointCloudPoint(sx, sy);
+        if(picked){
+            ui.drawingRoutePoints.push({x: picked.x, y: picked.y, z: picked.z});
+        }else{
+            const fallback = screenToWorldOnPlane(sx, sy, getDefaultDrawPlaneZ());
+            if(fallback){
+                ui.drawingRoutePoints.push({x: fallback.x, y: fallback.y, z: fallback.z});
+            }else{
+                alert("无法获取坐标");
+                return;
+            }
+        }
+        const label = ui.mode === "draw_curve" ? "曲线点" : "路线点";
+        setStatus(`已添加${label}，当前 ${ui.drawingRoutePoints.length} 个点`);
+        updateModeHint();
+        scheduleRender();
+        return;
+    }
+
+    if(ui.mode === "edit_route_z"){
+        const idx = findNearestDrawingRoutePointProjected(sx, sy, 16);
+        if(idx === null){
+            alert("未找到附近路线点，请点击已添加的点");
+            return;
+        }
+
+        const picked = pickNearestPointCloudPoint(sx, sy, 30);
+        if(picked){
+            setDrawingRoutePointZ(idx, picked.z);
+            setStatus(`已将第 ${idx + 1} 个点高度设置为附近点云高度 ${picked.z.toFixed(3)}`);
+            updateModeHint();
+            return;
+        }
+
+        const cur = ui.drawingRoutePoints[idx];
+        const newZ = prompt(`未找到附近点云，设置第 ${idx + 1} 个点的高度 Z（当前 ${cur.z.toFixed(2)}）:`, cur.z.toFixed(2));
+        if(newZ === null) return;
+        const zVal = parseFloat(newZ);
+        if(Number.isNaN(zVal)){
+            alert("请输入有效的数值");
+            return;
+        }
+        setDrawingRoutePointZ(idx, zVal);
+        setStatus(`已设置第 ${idx + 1} 个点高度为 ${zVal.toFixed(2)}`);
+        updateModeHint();
+        return;
+    }
+});
+
+function bindFileInput(id, handler){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("change", async e=>{
+        const f = e.target.files[0];
+        if(f) await handler(f);
+        e.target.value = "";
+    });
+}
+
+bindFileInput("pcdFileInput", uploadPcd);
+bindFileInput("workspaceFileInput", loadMapWorkspace);
+bindFileInput("paramsCfgFileInput", loadParamsConfigFile);
+
+document.addEventListener("click", async (e)=>{
+    const deleteBtn = e.target.closest("[data-delete-area-index]");
+    if(deleteBtn){
+        e.preventDefault();
+        e.stopPropagation();
+        const idx = parseInt(deleteBtn.dataset.deleteAreaIndex, 10);
+        await deleteDrivableAreaByIndex(idx);
+        return;
+    }
+
+    const actionBtn = e.target.closest("[data-action]");
+    if(!actionBtn) return;
+    const action = actionBtn.dataset.action;
+    if(!action) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if(action === "delete-selected-area"){
+        setStatus("已点击删除选中区域");
+        await deleteSelectedDrivableArea();
+    }else if(action === "mode-delete-area"){
+        setMode("delete_drivable_area");
+    }
+}, true);
+
+window.addEventListener("error", (e)=>{
+    setStatus("网页脚本错误: " + (e.message || "unknown"));
+});
+
+window.addEventListener("resize", resizeCanvas);
+
+window.onload = async ()=>{
+    document.querySelectorAll(".param-input").forEach(el=>{
+        el.addEventListener("focus", ()=>{ ui.isEditingParam = true; });
+        el.addEventListener("blur", ()=>{ ui.isEditingParam = false; });
+    });
+
+    const zSlider = document.getElementById("routeEditZ");
+    const zValue = document.getElementById("routeEditZValue");
+    if(zSlider){
+        zSlider.addEventListener("input", ()=>onRouteEditZInput(zSlider.value));
+    }
+    if(zValue){
+        zValue.addEventListener("change", ()=>onRouteEditZInput(zValue.value));
+    }
+
+    const zFilterEnabled = document.getElementById("zFilterEnabled");
+    const zFilterMin = document.getElementById("zFilterMin");
+    const zFilterMax = document.getElementById("zFilterMax");
+    if(zFilterEnabled){
+        zFilterEnabled.addEventListener("change", applyZFilterInputs);
+    }
+    [zFilterMin, zFilterMax].forEach(el=>{
+        if(!el) return;
+        el.addEventListener("focus", ()=>{ ui.isEditingParam = true; });
+        el.addEventListener("blur", ()=>{ ui.isEditingParam = false; });
+        el.addEventListener("change", applyZFilterInputs);
+    });
+
+    resizeCanvas();
+    updateModeHint();
+    connectWS();
+    try { updateRouteEditPanel(); } catch(e) {}
+    await refreshState(true);
+};
+</script>
+</body>
+</html>
